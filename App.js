@@ -2,6 +2,7 @@ import React from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from './src/auth/AuthContext';
+import { PurchasesProvider } from './src/purchases';
 import SignInScreen from './src/screens/SignInScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import { colors } from './src/theme';
@@ -20,11 +21,22 @@ const AppContent = () => {
   return user ? <HomeScreen /> : <SignInScreen />;
 };
 
+const PurchasesWrapper = ({ children }) => {
+  const { user } = useAuth();
+  return (
+    <PurchasesProvider userId={user?.id}>
+      {children}
+    </PurchasesProvider>
+  );
+};
+
 export default function App() {
   return (
     <AuthProvider>
-      <StatusBar style="dark" />
-      <AppContent />
+      <PurchasesWrapper>
+        <StatusBar style="dark" />
+        <AppContent />
+      </PurchasesWrapper>
     </AuthProvider>
   );
 }

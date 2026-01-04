@@ -1,11 +1,15 @@
-import React from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, Platform, Modal } from 'react-native';
 import { Button, Card, H1, H3, Body, BodySmall, Caption, Avatar, Badge, Divider } from '../components';
 import { colors, spacing } from '../theme';
 import { useAuth } from '../auth/AuthContext';
+import { usePurchases } from '../purchases';
+import PaywallScreen from './PaywallScreen';
 
 const HomeScreen = () => {
   const { user, signOut } = useAuth();
+  const { isPremium, isLoading: isPurchasesLoading } = usePurchases();
+  const [showPaywall, setShowPaywall] = useState(false);
 
   return (
     <View style={styles.container}>
@@ -43,7 +47,37 @@ const HomeScreen = () => {
           <BodySmall color={colors.gray600}>Sign-in Method</BodySmall>
           <Badge label="Google" variant="info" size="sm" />
         </View>
+        <View style={styles.infoRow}>
+          <BodySmall color={colors.gray600}>Subscription</BodySmall>
+          {isPurchasesLoading ? (
+            <Caption color={colors.gray400}>Loading...</Caption>
+          ) : (
+            <Badge
+              label={isPremium ? 'Premium' : 'Free'}
+              variant={isPremium ? 'success' : 'secondary'}
+              size="sm"
+            />
+          )}
+        </View>
       </Card>
+
+      {!isPremium && !isPurchasesLoading && (
+        <Card style={styles.upgradeCard}>
+          <View style={styles.upgradeContent}>
+            <View style={styles.upgradeText}>
+              <H3>Upgrade to Premium</H3>
+              <BodySmall color={colors.gray500}>
+                Unlock all features and remove ads
+              </BodySmall>
+            </View>
+            <Button
+              title="Upgrade"
+              onPress={() => setShowPaywall(true)}
+              size="sm"
+            />
+          </View>
+        </Card>
+      )}
 
       <View style={styles.signOutContainer}>
         <Button
@@ -52,6 +86,15 @@ const HomeScreen = () => {
           variant="outline"
         />
       </View>
+
+      <Modal
+        visible={showPaywall}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowPaywall(false)}
+      >
+        <PaywallScreen onClose={() => setShowPaywall(false)} />
+      </Modal>
     </View>
   );
 };
@@ -90,6 +133,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  upgradeCard: {
+    marginTop: spacing.lg,
+    backgroundColor: colors.primary + '10',
+    borderColor: colors.primary,
+    borderWidth: 1,
+  },
+  upgradeContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  upgradeText: {
+    flex: 1,
+    gap: spacing.xs,
   },
   signOutContainer: {
     marginTop: spacing.xl,

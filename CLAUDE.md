@@ -44,6 +44,8 @@ eas build --profile production --platform ios
 - `eas.json` - Build profiles
 - `src/theme/index.js` - Design tokens (colors, spacing, typography)
 - `src/components/` - Reusable UI components
+- `src/auth/` - Authentication (AuthContext, useGoogleAuth)
+- `src/purchases/` - In-app purchases (RevenueCat)
 
 ## UI Components
 All components in `src/components/`:
@@ -74,7 +76,32 @@ Design tokens in `src/theme/index.js`:
 - Bundle ID: `com.swapnilsawant.helloworld`
 - EAS Project: `@swapp1990/HelloWorld`
 
+## In-App Purchases (RevenueCat)
+Files in `src/purchases/`:
+- `config.js` - API key, entitlement IDs, product IDs
+- `PurchasesContext.js` - Provider and usePurchases hook
+- `usePurchaseActions.js` - Purchase/restore actions
+
+**Setup Required:**
+1. Create RevenueCat account at https://app.revenuecat.com
+2. Add iOS app with bundle ID `com.swapnilsawant.helloworld`
+3. Get Public SDK Key (starts with `appl_`) and update `config.js`
+4. Create entitlement "premium" and configure offerings
+5. Create products in App Store Connect and link to RevenueCat
+
+**Usage:**
+```javascript
+import { usePurchases, usePurchaseActions } from '../purchases';
+
+// Check premium status
+const { isPremium } = usePurchases();
+
+// Purchase actions
+const { handlePurchase, handleRestore, getPackages } = usePurchaseActions();
+```
+
 ## Troubleshooting
 - Hot reload stopped: Shake device > "Reload"
 - Connection fails: Use `--tunnel` flag
 - Clear cache: `npx expo start --clear`
+- Native module errors: Run `eas build --profile development --platform ios`
