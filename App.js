@@ -1,20 +1,39 @@
+import React from 'react';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { AuthProvider, useAuth } from './src/auth/AuthContext';
+import SignInScreen from './src/screens/SignInScreen';
+import HomeScreen from './src/screens/HomeScreen';
+import { colors } from './src/theme';
+
+const AppContent = () => {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
+  return user ? <HomeScreen /> : <SignInScreen />;
+};
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <AuthProvider>
+      <StatusBar style="dark" />
+      <AppContent />
+    </AuthProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  loading: {
     flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.gray50,
   },
 });

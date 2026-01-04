@@ -2,6 +2,7 @@
   "expo": {
     "name": "HelloWorld",
     "slug": "HelloWorld",
+    "scheme": "helloworld",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,7 +14,11 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.swapnilsawant.helloworld",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -24,6 +29,15 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "3aaeb2a6-6c75-4924-95e9-da48cb32fcfe"
+      }
+    },
+    "owner": "swapp1990",
+    "plugins": [
+      "expo-web-browser"
+    ]
   }
 }
