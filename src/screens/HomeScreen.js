@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Platform, Modal } from 'react-native';
+import { View, StyleSheet, Platform, Modal, ScrollView } from 'react-native';
 import { Button, Card, H1, H3, Body, BodySmall, Caption, Avatar, Badge, Divider } from '../components';
 import { colors, spacing } from '../theme';
 import { useAuth } from '../auth/AuthContext';
 import { usePurchases } from '../purchases';
 import PaywallScreen from './PaywallScreen';
+import ExtractionScreen from './ExtractionScreen';
 
 const HomeScreen = () => {
   const { user, signOut } = useAuth();
   const { isPremium, isLoading: isPurchasesLoading } = usePurchases();
   const [showPaywall, setShowPaywall] = useState(false);
+  const [showExtraction, setShowExtraction] = useState(false);
 
   return (
     <View style={styles.container}>
@@ -79,6 +81,23 @@ const HomeScreen = () => {
         </Card>
       )}
 
+      <Card style={styles.extractionCard}>
+        <View style={styles.extractionContent}>
+          <View style={styles.extractionText}>
+            <H3>Form Extraction</H3>
+            <BodySmall color={colors.gray500}>
+              Extract member info from membership forms
+            </BodySmall>
+          </View>
+          <Button
+            title="Open"
+            onPress={() => setShowExtraction(true)}
+            variant="outline"
+            size="sm"
+          />
+        </View>
+      </Card>
+
       <View style={styles.signOutContainer}>
         <Button
           title="Sign Out"
@@ -94,6 +113,15 @@ const HomeScreen = () => {
         onRequestClose={() => setShowPaywall(false)}
       >
         <PaywallScreen onClose={() => setShowPaywall(false)} />
+      </Modal>
+
+      <Modal
+        visible={showExtraction}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowExtraction(false)}
+      >
+        <ExtractionScreen onClose={() => setShowExtraction(false)} />
       </Modal>
     </View>
   );
@@ -147,6 +175,19 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   upgradeText: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  extractionCard: {
+    marginTop: spacing.lg,
+  },
+  extractionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  extractionText: {
     flex: 1,
     gap: spacing.xs,
   },

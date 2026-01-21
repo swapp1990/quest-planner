@@ -38,7 +38,14 @@
     "owner": "swapp1990",
     "plugins": [
       "expo-web-browser",
-      ["expo-build-properties", { "ios": { "deploymentTarget": "15.1" } }]
+      ["expo-build-properties", { "ios": { "deploymentTarget": "15.1" } }],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow $(PRODUCT_NAME) to access photos for form extraction.",
+          "cameraPermission": "Allow $(PRODUCT_NAME) to take photos of forms."
+        }
+      ]
     ]
   }
 }

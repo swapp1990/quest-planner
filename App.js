@@ -3,6 +3,7 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from './src/auth/AuthContext';
 import { PurchasesProvider } from './src/purchases';
+import { ExtractionProvider } from './src/extraction';
 import SignInScreen from './src/screens/SignInScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import { colors } from './src/theme';
@@ -25,7 +26,9 @@ const PurchasesWrapper = ({ children }) => {
   const { user } = useAuth();
   return (
     <PurchasesProvider userId={user?.id}>
-      {children}
+      <ExtractionProvider>
+        {children}
+      </ExtractionProvider>
     </PurchasesProvider>
   );
 };
