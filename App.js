@@ -1,15 +1,12 @@
 import React from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { AuthProvider, useAuth } from './src/auth/AuthContext';
-import { PurchasesProvider } from './src/purchases';
-import { ExtractionProvider } from './src/extraction';
-import SignInScreen from './src/screens/SignInScreen';
-import HomeScreen from './src/screens/HomeScreen';
+import { HabitsProvider, useHabits } from './src/habits';
+import AppNavigator from './src/navigation/AppNavigator';
 import { colors } from './src/theme';
 
 const AppContent = () => {
-  const { user, isLoading } = useAuth();
+  const { isLoading } = useHabits();
 
   if (isLoading) {
     return (
@@ -19,28 +16,15 @@ const AppContent = () => {
     );
   }
 
-  return user ? <HomeScreen /> : <SignInScreen />;
-};
-
-const PurchasesWrapper = ({ children }) => {
-  const { user } = useAuth();
-  return (
-    <PurchasesProvider userId={user?.id}>
-      <ExtractionProvider>
-        {children}
-      </ExtractionProvider>
-    </PurchasesProvider>
-  );
+  return <AppNavigator />;
 };
 
 export default function App() {
   return (
-    <AuthProvider>
-      <PurchasesWrapper>
-        <StatusBar style="dark" />
-        <AppContent />
-      </PurchasesWrapper>
-    </AuthProvider>
+    <HabitsProvider>
+      <StatusBar style="dark" />
+      <AppContent />
+    </HabitsProvider>
   );
 }
 
