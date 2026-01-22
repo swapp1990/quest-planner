@@ -1,13 +1,30 @@
-import React from 'react';
-import { View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Animated } from 'react-native';
 import Svg, { Path, G } from 'react-native-svg';
 
-const CircularProgress = ({ size = 140, strokeWidth = 8, progress = 0, maxSegments = 5, color = '#fff' }) => {
+const AnimatedPath = Animated.createAnimatedComponent(Path);
+
+const CircularProgress = ({
+  size = 140,
+  strokeWidth = 8,
+  progress = 0,
+  maxSegments = 5,
+  color = '#fff',
+}) => {
   const radius = (size - strokeWidth) / 2;
   const center = size / 2;
+  const animatedProgress = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(animatedProgress, {
+      toValue: progress,
+      duration: 400,
+      useNativeDriver: false,
+    }).start();
+  }, [progress]);
 
   // Calculate angles for segments
-  const gapAngle = 12; // degrees between segments
+  const gapAngle = 8; // degrees between segments (smaller for cleaner look)
   const totalGapAngle = gapAngle * maxSegments;
   const segmentAngle = (360 - totalGapAngle) / maxSegments;
 
@@ -52,14 +69,22 @@ const CircularProgress = ({ size = 140, strokeWidth = 8, progress = 0, maxSegmen
 
     const pathData = describeArc(center, center, radius, startAngle, endAngle);
 
+    // Animated opacity for smooth transitions
+    const opacity = animatedProgress.interpolate({
+      inputRange: [(i / maxSegments) * 100, ((i + 1) / maxSegments) * 100],
+      outputRange: [0.2, 1],
+      extrapolate: 'clamp',
+    });
+
     segments.push(
-      <Path
+      <AnimatedPath
         key={i}
         d={pathData}
-        stroke={isCompleted ? color : 'rgba(255, 255, 255, 0.2)'}
+        stroke={isCompleted ? color : 'rgba(255, 255, 255, 0.15)'}
         strokeWidth={strokeWidth}
         fill="none"
         strokeLinecap="round"
+        opacity={isCompleted ? opacity : 1}
       />
     );
   }

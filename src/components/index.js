@@ -8,3 +8,15 @@ export { default as Divider } from './Divider';
 export { default as ExtractionHistoryItem } from './ExtractionHistoryItem';
 export { default as HabitForm } from './HabitForm';
 export { default as HabitCalendar } from './HabitCalendar';
+export { default as StreakCard } from './StreakCard';
+export { default as EmojiPicker } from './EmojiPicker';
+
+// Common reusable components
+export {
+  ListRow,
+  IconButton,
+  SectionHeader,
+  ModalHeader,
+  InfoBanner,
+  ThemedModal,
+} from './common';

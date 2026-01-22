@@ -32,6 +32,13 @@ export const colors = {
   errorLight: '#FEE2E2',
   info: '#3B82F6',
   infoLight: '#DBEAFE',
+
+  // UI colors
+  text: '#111827',
+  textSecondary: '#6B7280',
+  background: '#F9FAFB',
+  surface: '#F9FAFB',
+  border: '#E5E7EB',
 };
 
 export const spacing = {
