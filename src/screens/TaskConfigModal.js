@@ -79,6 +79,7 @@ const TaskConfigModal = ({ visible, task, onClose, onSave, onBack }) => {
               strokeWidth={10}
               progress={0}
               maxSegments={maxStreak}
+              completedSegments={0}
               color="#fff"
             />
             <View style={styles.iconContainer}>

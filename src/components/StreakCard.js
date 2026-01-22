@@ -96,6 +96,7 @@ const StreakCard = ({ habit, onPress, onLongPress }) => {
             strokeWidth={10}
             progress={progress}
             maxSegments={habit.maxStreak}
+            completedSegments={habit.completedToday}
             color="#fff"
           />
 

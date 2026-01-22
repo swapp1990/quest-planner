@@ -1,34 +1,27 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Animated } from 'react-native';
+import React from 'react';
+import { View } from 'react-native';
 import Svg, { Path, G } from 'react-native-svg';
-
-const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 const CircularProgress = ({
   size = 140,
   strokeWidth = 8,
   progress = 0,
   maxSegments = 5,
+  completedSegments: completedSegmentsProp,
   color = '#fff',
 }) => {
   const radius = (size - strokeWidth) / 2;
   const center = size / 2;
-  const animatedProgress = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(animatedProgress, {
-      toValue: progress,
-      duration: 400,
-      useNativeDriver: false,
-    }).start();
-  }, [progress]);
 
   // Calculate angles for segments
   const gapAngle = 8; // degrees between segments (smaller for cleaner look)
   const totalGapAngle = gapAngle * maxSegments;
   const segmentAngle = (360 - totalGapAngle) / maxSegments;
 
-  const completedSegments = Math.floor((progress / 100) * maxSegments);
+  // Use completedSegments prop directly if provided, otherwise calculate from progress
+  const completedSegments = completedSegmentsProp !== undefined
+    ? completedSegmentsProp
+    : Math.round((progress / 100) * maxSegments);
 
   // Helper function to convert polar coordinates to cartesian
   // 0 degrees = top (12 o'clock)
@@ -69,22 +62,15 @@ const CircularProgress = ({
 
     const pathData = describeArc(center, center, radius, startAngle, endAngle);
 
-    // Animated opacity for smooth transitions
-    const opacity = animatedProgress.interpolate({
-      inputRange: [(i / maxSegments) * 100, ((i + 1) / maxSegments) * 100],
-      outputRange: [0.2, 1],
-      extrapolate: 'clamp',
-    });
-
+    // Use solid colors - completed segments are full opacity, incomplete are faint
     segments.push(
-      <AnimatedPath
+      <Path
         key={i}
         d={pathData}
-        stroke={isCompleted ? color : 'rgba(255, 255, 255, 0.15)'}
+        stroke={isCompleted ? color : 'rgba(255, 255, 255, 0.2)'}
         strokeWidth={strokeWidth}
         fill="none"
         strokeLinecap="round"
-        opacity={isCompleted ? opacity : 1}
       />
     );
   }
