@@ -10,6 +10,8 @@ export { default as HabitForm } from './HabitForm';
 export { default as HabitCalendar } from './HabitCalendar';
 export { default as StreakCard } from './StreakCard';
 export { default as EmojiPicker } from './EmojiPicker';
+export { default as ChapterCard } from './ChapterCard';
+export { default as QuestCard } from './QuestCard';
 
 // Common reusable components
 export {

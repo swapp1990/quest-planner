@@ -21,7 +21,7 @@ import StreaksSettingsScreen from './StreaksSettingsScreen';
 
 const { width, height } = Dimensions.get('window');
 
-const StreaksScreen = () => {
+const StreaksScreen = ({ onNavigateToCampaign }) => {
   const { habits, incrementHabit, addHabit, updateHabit, deleteHabit } =
     useStreaks();
   const [currentPage, setCurrentPage] = useState(0);
@@ -207,8 +207,11 @@ const StreaksScreen = () => {
             ))}
           </View>
 
-          <TouchableOpacity style={styles.navButton}>
-            <Text style={styles.navIcon}>⭐</Text>
+          <TouchableOpacity
+            style={styles.navButton}
+            onPress={onNavigateToCampaign}
+          >
+            <Text style={styles.navIcon}>🗺️</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>

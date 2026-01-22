@@ -229,10 +229,7 @@ const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelecte
   }, [justCompletedChapter]);
 
   const handleQuestPress = (quest) => {
-    console.log('handleQuestPress called', { quest: quest?.name, displayedChapter: displayedChapter?.id, isViewingLockedChapter });
     if (displayedChapter && !isViewingLockedChapter) {
-      // Show the quest action modal instead of incrementing directly
-      console.log('Setting quest and showing modal');
       setSelectedQuest(quest);
       setShowQuestAction(true);
     }
