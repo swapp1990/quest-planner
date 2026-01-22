@@ -16,6 +16,7 @@ import CircularProgress from '../components/CircularProgress';
 import * as Haptics from 'expo-haptics';
 import QuestInfoModal from './QuestInfoModal';
 import QuestActionModal from './QuestActionModal';
+import { MemoryStampModal, generateStamp, getStampInsights } from '../memories';
 
 const { width } = Dimensions.get('window');
 // Match StreakCard sizing exactly
@@ -123,8 +124,26 @@ const QuestCircle = ({ quest, onPress, isLocked = false }) => {
   );
 };
 
-// Act indicator (subtle, mysterious)
-const ActIndicator = ({ chapter, chapterIndex, isCurrentAct, isCompleted, isLocked, onPress }) => {
+// Act indicator - shows stamp when completed
+const ActIndicator = ({
+  chapter,
+  chapterIndex,
+  isCurrentAct,
+  isCompleted,
+  isLocked,
+  stamp,
+  onPress,
+  onStampPress,
+}) => {
+  const handlePress = () => {
+    if (isLocked) return;
+    if (isCompleted && stamp && onStampPress) {
+      onStampPress();
+    } else {
+      onPress();
+    }
+  };
+
   return (
     <TouchableOpacity
       style={[
@@ -133,11 +152,13 @@ const ActIndicator = ({ chapter, chapterIndex, isCurrentAct, isCompleted, isLock
         isCompleted && styles.actDotCompleted,
         isLocked && styles.actDotLocked,
       ]}
-      onPress={() => !isLocked && onPress()}
+      onPress={handlePress}
       disabled={isLocked}
       activeOpacity={0.7}
     >
-      {isCompleted ? (
+      {isCompleted && stamp ? (
+        <Text style={styles.actStampIcon}>{stamp.actIcon}</Text>
+      ) : isCompleted ? (
         <Text style={styles.actDotText}>✓</Text>
       ) : isLocked ? (
         <Text style={styles.actDotTextLocked}>?</Text>
@@ -171,6 +192,7 @@ const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelecte
   const [viewingChapter, setViewingChapter] = useState(null);
   const [showQuestAction, setShowQuestAction] = useState(false);
   const [selectedQuest, setSelectedQuest] = useState(null);
+  const [selectedStamp, setSelectedStamp] = useState(null);
 
   // Find current (first incomplete) chapter
   const currentChapterIndex = campaign?.chapters.findIndex(
@@ -305,47 +327,96 @@ const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelecte
             </View>
           </View>
 
-          {/* Current Act Info */}
+          {/* Current Act Info with Stamp Row */}
           {displayedChapter && (
-            <TouchableOpacity
-              style={[
-                styles.currentActBanner,
-                isViewingLockedChapter && styles.lockedActBanner,
-              ]}
-              onPress={() => onViewAct(displayedChapter)}
-              activeOpacity={0.8}
-            >
-              <View style={styles.actBannerContent}>
-                <View style={styles.actInfo}>
-                  <View style={styles.actSubtitleRow}>
-                    <Text style={styles.actSubtitle}>{displayedChapter.subtitle}</Text>
-                    {isViewingLockedChapter && (
-                      <View style={styles.lockedBadge}>
-                        <Text style={styles.lockedBadgeText}>LOCKED</Text>
-                      </View>
-                    )}
+            <View style={styles.currentActBanner}>
+              <TouchableOpacity
+                style={[isViewingLockedChapter && styles.lockedActBanner]}
+                onPress={() => onViewAct(displayedChapter)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.actBannerContent}>
+                  <View style={styles.actInfo}>
+                    <View style={styles.actSubtitleRow}>
+                      <Text style={styles.actSubtitle}>{displayedChapter.subtitle}</Text>
+                      {isViewingLockedChapter && (
+                        <View style={styles.lockedBadge}>
+                          <Text style={styles.lockedBadgeText}>LOCKED</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.actTitle}>{displayedChapter.title}</Text>
                   </View>
-                  <Text style={styles.actTitle}>{displayedChapter.title}</Text>
+                  <Text style={styles.actChevron}>›</Text>
                 </View>
-                <Text style={styles.actChevron}>›</Text>
-              </View>
-              {/* Progress Bar */}
-              {!isViewingLockedChapter && (
-                <View style={styles.actProgressBarContainer}>
-                  <View style={styles.actProgressBarBackground}>
-                    <View
-                      style={[
-                        styles.actProgressBarFill,
-                        { width: `${getChapterProgress(displayedChapter)}%` },
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.actProgressText}>
-                    {Math.round(getChapterProgress(displayedChapter))}%
-                  </Text>
+              </TouchableOpacity>
+
+              {/* Stamp Row - only show if at least one stamp earned */}
+              {campaign.chapters.some(ch =>
+                isChapterComplete(ch) && actOnboardingState[ch.id]?.answers
+              ) && (
+                <View style={styles.stampRow}>
+                  {campaign.chapters.map((chapter, index) => {
+                    const isComplete = isChapterComplete(chapter);
+                    const isLocked = checkChapterLocked(index);
+                    const isCurrent = index === displayedChapterIndex;
+                    const answers = actOnboardingState[chapter.id]?.answers;
+                    const stamp = answers ? generateStamp(chapter.id, answers) : null;
+                    const isEarned = isComplete && stamp;
+                    const isJustEarned = justCompletedChapter === chapter.id;
+
+                    const handleStampPress = () => {
+                      if (isEarned) {
+                        const insights = getStampInsights(chapter.id, answers);
+                        setSelectedStamp({
+                          ...stamp,
+                          insights,
+                          chapterNumber: index + 1,
+                        });
+                      } else if (!isLocked) {
+                        onViewAct(chapter);
+                      }
+                    };
+
+                    return (
+                      <Animated.View
+                        key={chapter.id}
+                        style={[
+                          isJustEarned && {
+                            transform: [{
+                              scale: celebrationAnim.interpolate({
+                                inputRange: [0, 0.5, 1],
+                                outputRange: [1, 1.3, 1],
+                              })
+                            }],
+                          },
+                        ]}
+                      >
+                        <TouchableOpacity
+                          style={[
+                            styles.stampDot,
+                            isCurrent && !isEarned && styles.stampDotCurrent,
+                            isEarned && styles.stampDotComplete,
+                            isLocked && styles.stampDotLocked,
+                          ]}
+                          onPress={handleStampPress}
+                          disabled={isLocked}
+                          activeOpacity={0.7}
+                        >
+                          {isEarned ? (
+                            <Text style={styles.stampIcon}>{stamp.actIcon}</Text>
+                          ) : isLocked ? (
+                            <Text style={styles.stampLockIcon}>🔒</Text>
+                          ) : (
+                            <Text style={styles.stampNumber}>{index + 1}</Text>
+                          )}
+                        </TouchableOpacity>
+                      </Animated.View>
+                    );
+                  })}
                 </View>
               )}
-            </TouchableOpacity>
+            </View>
           )}
 
           {/* Back to current act button when viewing other chapter */}
@@ -378,21 +449,8 @@ const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelecte
           </View>
         </ScrollView>
 
-        {/* Bottom Act Navigation */}
+        {/* Bottom hint */}
         <View style={styles.bottomNav}>
-          <View style={styles.actIndicators}>
-            {campaign.chapters.map((chapter, index) => (
-              <ActIndicator
-                key={chapter.id}
-                chapter={chapter}
-                chapterIndex={index}
-                isCurrentAct={index === displayedChapterIndex}
-                isCompleted={isChapterComplete(chapter)}
-                isLocked={checkChapterLocked(index)}
-                onPress={() => onViewAct(chapter)}
-              />
-            ))}
-          </View>
           <Text style={styles.actHint}>
             {displayedChapter ? `${displayedChapter.subtitle}` : 'Journey Complete'}
           </Text>
@@ -443,6 +501,13 @@ const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelecte
             onClose={handleQuestActionClose}
           />
         )}
+
+        {/* Memory Stamp Modal */}
+        <MemoryStampModal
+          visible={selectedStamp !== null}
+          stamp={selectedStamp}
+          onClose={() => setSelectedStamp(null)}
+        />
       </SafeAreaView>
     </LinearGradient>
   );
@@ -537,6 +602,47 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.5)',
     fontSize: 24,
     fontWeight: '300',
+  },
+  // Stamp Row in Act Banner
+  stampRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  stampDot: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stampDotCurrent: {
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  stampDotComplete: {
+    backgroundColor: '#fff',
+  },
+  stampDotLocked: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  stampIcon: {
+    fontSize: 20,
+  },
+  stampLockIcon: {
+    fontSize: 14,
+    opacity: 0.4,
+  },
+  stampNumber: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
   actProgressBarContainer: {
     flexDirection: 'row',
@@ -700,9 +806,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   actDot: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
@@ -711,7 +817,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   actDotCompleted: {
-    backgroundColor: 'rgba(76, 175, 80, 0.6)',
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
   },
   actDotLocked: {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -725,6 +836,9 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.3)',
     fontSize: 14,
     fontWeight: '700',
+  },
+  actStampIcon: {
+    fontSize: 20,
   },
   actHint: {
     color: 'rgba(255, 255, 255, 0.5)',
