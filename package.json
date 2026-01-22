@@ -6,7 +6,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "generate-one-pager": "node scripts/generate-one-pager.js"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
@@ -23,5 +24,8 @@
     "react-native-screens": "~4.16.0",
     "react-native-svg": "^15.12.1"
   },
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "puppeteer-core": "^24.36.0"
+  }
 }

@@ -15,6 +15,7 @@ import { SOLO_TRIP_CAMPAIGN } from './soloTripData';
 
 const STORAGE_KEY = '@campaign_data';
 const ONBOARDING_STORAGE_KEY = '@campaign_onboarding';
+const BRIEFING_STORAGE_KEY = '@campaign_briefing';
 
 // Set to true to clear cache on app reload (for development)
 const DEV_CLEAR_CACHE = true;
@@ -29,6 +30,10 @@ export const CampaignProvider = ({ children }) => {
   // Act onboarding state
   // Structure: { 'chapter-1': { onboarded: true, questInfoSeen: true, answers: [0, 2, 1, 3, 0] }, ... }
   const [actOnboardingState, setActOnboardingState] = useState({});
+
+  // User profile from campaign briefing
+  // Structure: { chatResponses: {...}, constraints: {...}, selectedPlan: 'comfort', briefingCompletedAt: timestamp }
+  const [userProfile, setUserProfile] = useState(null);
 
   // Load campaign on mount
   useEffect(() => {
@@ -48,6 +53,7 @@ export const CampaignProvider = ({ children }) => {
       if (DEV_CLEAR_CACHE) {
         await AsyncStorage.removeItem(STORAGE_KEY);
         await AsyncStorage.removeItem(ONBOARDING_STORAGE_KEY);
+        await AsyncStorage.removeItem(BRIEFING_STORAGE_KEY);
         console.log('Campaign cache cleared');
       }
 
@@ -60,6 +66,12 @@ export const CampaignProvider = ({ children }) => {
       const onboardingStored = await AsyncStorage.getItem(ONBOARDING_STORAGE_KEY);
       if (onboardingStored) {
         setActOnboardingState(JSON.parse(onboardingStored));
+      }
+
+      // Load briefing/user profile
+      const briefingStored = await AsyncStorage.getItem(BRIEFING_STORAGE_KEY);
+      if (briefingStored) {
+        setUserProfile(JSON.parse(briefingStored));
       }
     } catch (error) {
       console.error('Error loading campaign:', error);
@@ -157,8 +169,10 @@ export const CampaignProvider = ({ children }) => {
   const resetCampaign = async () => {
     setCampaign(null);
     setActOnboardingState({});
+    setUserProfile(null);
     await AsyncStorage.removeItem(STORAGE_KEY);
     await AsyncStorage.removeItem(ONBOARDING_STORAGE_KEY);
+    await AsyncStorage.removeItem(BRIEFING_STORAGE_KEY);
   };
 
   /**
@@ -216,6 +230,91 @@ export const CampaignProvider = ({ children }) => {
     return actOnboardingState[chapterId]?.answers || null;
   };
 
+  // ============================================================
+  // Campaign Briefing Methods
+  // ============================================================
+
+  /**
+   * Save briefing/user profile to storage
+   */
+  const saveBriefing = async (profile) => {
+    try {
+      await AsyncStorage.setItem(BRIEFING_STORAGE_KEY, JSON.stringify(profile));
+    } catch (error) {
+      console.error('Error saving briefing:', error);
+    }
+  };
+
+  /**
+   * Complete campaign briefing and store user profile
+   * @param {Object} briefingData - { chatResponses, constraints, selectedPlan, quests, briefingCompletedAt }
+   */
+  const completeBriefing = (briefingData) => {
+    const profile = {
+      chatResponses: briefingData.chatResponses,
+      constraints: briefingData.constraints,
+      constraintsAdjusted: false, // Track if user adjusted constraints
+      selectedPlan: briefingData.selectedPlan,
+      briefingCompletedAt: briefingData.briefingCompletedAt,
+    };
+
+    setUserProfile(profile);
+    saveBriefing(profile);
+
+    // Also initialize the campaign with generated quests
+    if (briefingData.quests) {
+      const campaignWithQuests = initializeCampaign({
+        ...SOLO_TRIP_CAMPAIGN,
+        chapters: SOLO_TRIP_CAMPAIGN.chapters.map((chapter, index) => {
+          // Only apply custom quests to the first chapter for now
+          if (index === 0) {
+            return {
+              ...chapter,
+              quests: briefingData.quests,
+            };
+          }
+          return chapter;
+        }),
+      });
+      setCampaign(campaignWithQuests);
+    }
+
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  /**
+   * Check if campaign briefing is complete
+   * @returns {boolean}
+   */
+  const isBriefingComplete = () => {
+    return userProfile?.briefingCompletedAt != null;
+  };
+
+  /**
+   * Get user profile
+   * @returns {Object|null}
+   */
+  const getUserProfile = () => {
+    return userProfile;
+  };
+
+  /**
+   * Update constraints after briefing (if user adjusts them)
+   * @param {Object} newConstraints
+   */
+  const updateConstraints = (newConstraints) => {
+    if (!userProfile) return;
+
+    const updatedProfile = {
+      ...userProfile,
+      constraints: newConstraints,
+      constraintsAdjusted: true,
+    };
+
+    setUserProfile(updatedProfile);
+    saveBriefing(updatedProfile);
+  };
+
   /**
    * Get chapter by ID
    */
@@ -237,6 +336,7 @@ export const CampaignProvider = ({ children }) => {
     isLoading,
     justCompletedChapter,
     actOnboardingState,
+    userProfile,
     startCampaign,
     incrementQuest,
     resetCampaign,
@@ -249,6 +349,11 @@ export const CampaignProvider = ({ children }) => {
     needsOnboarding,
     needsQuestInfo,
     getOnboardingAnswers,
+    // Briefing methods
+    completeBriefing,
+    isBriefingComplete,
+    getUserProfile,
+    updateConstraints,
     // Utility functions exposed
     getChapterProgress: (chapter) => getChapterProgress(chapter),
     getCampaignProgress: () => campaign ? getCampaignProgress(campaign) : 0,

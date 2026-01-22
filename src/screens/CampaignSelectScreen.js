@@ -19,7 +19,7 @@ const CAMPAIGNS = [
     icon: '✈️',
     difficulty: 'Beginner',
     chapters: 4,
-    quests: 13,
+    questsEstimate: '6-8 per act',
     isLocked: false,
   },
   {
@@ -29,7 +29,7 @@ const CAMPAIGNS = [
     icon: '💪',
     difficulty: 'Intermediate',
     chapters: 6,
-    quests: 24,
+    questsEstimate: '~24',
     isLocked: true,
   },
   {
@@ -39,7 +39,7 @@ const CAMPAIGNS = [
     icon: '🗣️',
     difficulty: 'Intermediate',
     chapters: 8,
-    quests: 32,
+    questsEstimate: '~32',
     isLocked: true,
   },
   {
@@ -49,7 +49,7 @@ const CAMPAIGNS = [
     icon: '🚀',
     difficulty: 'Advanced',
     chapters: 5,
-    quests: 20,
+    questsEstimate: '~20',
     isLocked: true,
   },
 ];
@@ -85,7 +85,7 @@ const CampaignCard = ({ campaign, onPress }) => {
           {campaign.description}
         </Text>
         <Text style={[styles.cardMeta, isLocked && styles.textLocked]}>
-          {campaign.chapters} Acts • {campaign.quests} Quests
+          {campaign.chapters} Acts • {campaign.questsEstimate} quests
         </Text>
       </View>
 

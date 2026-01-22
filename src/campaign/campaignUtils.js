@@ -103,8 +103,9 @@ export const initializeCampaign = (campaignTemplate) => {
       id: `chapter-${chapter.order}`,
       quests: chapter.quests.map((quest, questIndex) => ({
         ...quest,
-        id: `quest-${chapter.order}-${quest.order}`,
-        completedSegments: 0,
+        // Use existing id if present, otherwise generate from order or index
+        id: quest.id || `quest-${chapter.order}-${quest.order || questIndex + 1}`,
+        completedSegments: quest.completedSegments ?? 0,
       })),
     })),
   };

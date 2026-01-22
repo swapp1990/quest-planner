@@ -21,10 +21,10 @@ const CampaignIntroScreen = ({ campaign, onBegin, onBack }) => {
     ? CAMPAIGN_TEMPLATES[campaign.id]
     : SOLO_TRIP_CAMPAIGN;
 
-  const totalQuests = campaignData.chapters.reduce(
-    (sum, ch) => sum + ch.quests.length,
-    0
-  );
+  // Show estimate since quests are AI-generated and user-selectable
+  // Base estimate: 6-8 quests per act depending on plan choice
+  const estimatedQuestsPerAct = '6-8';
+  const totalActsCount = campaignData.chapters.length;
 
   return (
     <LinearGradient
@@ -48,13 +48,13 @@ const CampaignIntroScreen = ({ campaign, onBegin, onBack }) => {
 
           <View style={styles.stats}>
             <View style={styles.stat}>
-              <Text style={styles.statNumber}>{campaignData.chapters.length}</Text>
+              <Text style={styles.statNumber}>{totalActsCount}</Text>
               <Text style={styles.statLabel}>Acts</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.stat}>
-              <Text style={styles.statNumber}>{totalQuests}</Text>
-              <Text style={styles.statLabel}>Quests</Text>
+              <Text style={styles.statNumber}>{estimatedQuestsPerAct}</Text>
+              <Text style={styles.statLabel}>Quests/Act</Text>
             </View>
           </View>
 

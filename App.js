@@ -5,11 +5,13 @@ import CampaignIntroScreen from './src/screens/CampaignIntroScreen';
 import CampaignHomeScreen from './src/screens/CampaignHomeScreen';
 import ChapterDetailScreen from './src/screens/ChapterDetailScreen';
 import ActOnboardingModal from './src/screens/ActOnboardingModal';
+import CampaignBriefingModal from './src/screens/CampaignBriefingModal';
 
 // Navigation screens
 const SCREENS = {
   SELECT: 'select',
   INTRO: 'intro',
+  BRIEFING: 'briefing',
   ONBOARDING: 'onboarding',
   HOME: 'home',
   CHAPTER: 'chapter',
@@ -17,7 +19,15 @@ const SCREENS = {
 
 // Main app content with navigation
 const AppContent = () => {
-  const { campaign, startCampaign, completeActOnboarding, needsOnboarding, isChapterComplete } = useCampaign();
+  const {
+    campaign,
+    startCampaign,
+    completeActOnboarding,
+    needsOnboarding,
+    isChapterComplete,
+    completeBriefing,
+    isBriefingComplete,
+  } = useCampaign();
   const [currentScreen, setCurrentScreen] = useState(
     campaign ? SCREENS.HOME : SCREENS.SELECT
   );
@@ -39,16 +49,8 @@ const AppContent = () => {
   };
 
   const handleBeginJourney = () => {
-    startCampaign();
-    // Get the first chapter for onboarding
-    const firstChapter = SOLO_TRIP_CAMPAIGN.chapters[0];
-    // Create a chapter object with id for onboarding
-    const chapterWithId = {
-      ...firstChapter,
-      id: `chapter-${firstChapter.order}`,
-    };
-    setOnboardingChapter(chapterWithId);
-    setCurrentScreen(SCREENS.ONBOARDING);
+    // Go to briefing flow (new 3-step campaign briefing)
+    setCurrentScreen(SCREENS.BRIEFING);
   };
 
   const handleBackToSelect = () => {
@@ -61,6 +63,20 @@ const AppContent = () => {
     setCurrentScreen(SCREENS.HOME);
   };
 
+  // Briefing (new 3-step flow) handlers
+  const handleBriefingComplete = (briefingData) => {
+    completeBriefing(briefingData);
+    // Also mark first chapter as onboarded since briefing replaces it
+    completeActOnboarding('chapter-1', []);
+    setCurrentScreen(SCREENS.HOME);
+  };
+
+  const handleBriefingClose = () => {
+    // Go back to intro if closing briefing without completing
+    setCurrentScreen(SCREENS.INTRO);
+  };
+
+  // Legacy act onboarding handlers (for subsequent chapters)
   const handleOnboardingComplete = (answers) => {
     if (onboardingChapter) {
       completeActOnboarding(onboardingChapter.id, answers);
@@ -115,6 +131,14 @@ const AppContent = () => {
           campaign={selectedCampaign}
           onBegin={handleBeginJourney}
           onBack={handleBackToSelect}
+        />
+      );
+
+    case SCREENS.BRIEFING:
+      return (
+        <CampaignBriefingModal
+          onComplete={handleBriefingComplete}
+          onClose={handleBriefingClose}
         />
       );
 
