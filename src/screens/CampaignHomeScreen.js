@@ -17,7 +17,6 @@ import * as Haptics from 'expo-haptics';
 import QuestInfoModal from './QuestInfoModal';
 import QuestActionModal from './QuestActionModal';
 import { MemoryStampModal, StampRevealModal, generateStamp, getStampInsights } from '../memories';
-import { ActUnlockModal } from '../components';
 
 const { width } = Dimensions.get('window');
 // Match StreakCard sizing exactly
@@ -189,8 +188,8 @@ const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelecte
 
   const [showCelebration, setShowCelebration] = useState(false);
   const [showStampCollecting, setShowStampCollecting] = useState(false);
-  const [showActUnlock, setShowActUnlock] = useState(false);
-  const [nextActInfo, setNextActInfo] = useState(null);
+  const [showUnlockOverlay, setShowUnlockOverlay] = useState(false);
+  const [unlockingAct, setUnlockingAct] = useState(null);
   const [showQuestInfo, setShowQuestInfo] = useState(false);
   const [questInfoFirstTime, setQuestInfoFirstTime] = useState(false);
   const [viewingChapter, setViewingChapter] = useState(null);
@@ -230,7 +229,7 @@ const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelecte
     }
   }, [justCompletedChapter]);
 
-  // Handle stamp reveal continue - show stamp collecting animation then act unlock
+  // Handle stamp reveal continue - show stamp collecting animation then navigate to locked act
   const handleStampRevealContinue = () => {
     setShowCelebration(false);
 
@@ -251,14 +250,20 @@ const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelecte
         duration: 800,
         useNativeDriver: true,
       }).start(() => {
-        // After animation, show act unlock modal
         setShowStampCollecting(false);
-        setNextActInfo({
+        clearChapterCelebration();
+
+        // Navigate to next act and show unlock overlay
+        setUnlockingAct({
           actNumber: completedIndex + 2,
           actTitle: nextChapter.title,
+          actSubtitle: nextChapter.subtitle,
           chapter: nextChapter,
         });
-        setShowActUnlock(true);
+        setShowUnlockOverlay(true);
+
+        // Navigate to the act (it will show with overlay on top)
+        onViewAct(nextChapter);
       });
     } else {
       // Last act completed - just clear celebration
@@ -266,18 +271,18 @@ const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelecte
     }
   };
 
-  // Handle act unlock continue - navigate to next act
-  const handleActUnlockContinue = () => {
-    setShowActUnlock(false);
-    clearChapterCelebration();
+  // Handle unlock overlay - dismiss overlay and proceed
+  const handleUnlockAct = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setShowUnlockOverlay(false);
 
-    if (nextActInfo?.chapter) {
-      // Navigate to next act with onboarding check
+    // Navigate to onboarding for the new act
+    if (unlockingAct?.chapter) {
       setTimeout(() => {
-        onViewAct(nextActInfo.chapter);
+        onViewAct(unlockingAct.chapter);
       }, 300);
     }
-    setNextActInfo(null);
+    setUnlockingAct(null);
   };
 
   const handleQuestPress = (quest) => {
@@ -530,13 +535,26 @@ const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelecte
           </View>
         )}
 
-        {/* Act Unlock Modal */}
-        <ActUnlockModal
-          visible={showActUnlock}
-          actNumber={nextActInfo?.actNumber || 2}
-          actTitle={nextActInfo?.actTitle || ''}
-          onContinue={handleActUnlockContinue}
-        />
+        {/* Act Unlock Overlay - shows on top of the act's quests */}
+        {showUnlockOverlay && unlockingAct && (
+          <View style={styles.unlockOverlay}>
+            <View style={styles.unlockContent}>
+              <View style={styles.unlockIconContainer}>
+                <Text style={styles.unlockLockIcon}>🔓</Text>
+              </View>
+              <Text style={styles.unlockReadyText}>Ready for</Text>
+              <Text style={styles.unlockActNumber}>Act {unlockingAct.actNumber}</Text>
+              <Text style={styles.unlockActTitle}>{unlockingAct.actTitle}</Text>
+              <TouchableOpacity
+                style={styles.unlockButton}
+                onPress={handleUnlockAct}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.unlockButtonText}>Let's Go!</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* Quest Info Modal */}
         {showQuestInfo && viewingChapter && (
@@ -931,6 +949,66 @@ const styles = StyleSheet.create({
   },
   collectingEmoji: {
     fontSize: 48,
+  },
+  // Unlock Overlay
+  unlockOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  unlockContent: {
+    alignItems: 'center',
+  },
+  unlockIconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  unlockLockIcon: {
+    fontSize: 48,
+  },
+  unlockReadyText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.7)',
+    textTransform: 'uppercase',
+    letterSpacing: 2,
+    marginBottom: 8,
+  },
+  unlockActNumber: {
+    fontSize: 36,
+    fontWeight: '800',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  unlockActTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  unlockButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 48,
+    paddingVertical: 16,
+    borderRadius: 16,
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  unlockButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
   },
   // Celebration
   celebrationOverlay: {
