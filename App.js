@@ -1,23 +1,20 @@
-import React, { useState } from 'react';
-import { CampaignProvider, useCampaign, SOLO_TRIP_CAMPAIGN } from './src/campaign';
+import React, { useReducer, useEffect } from 'react';
+import { CampaignProvider, useCampaign } from './src/campaign';
 import CampaignSelectScreen from './src/screens/CampaignSelectScreen';
 import CampaignIntroScreen from './src/screens/CampaignIntroScreen';
 import CampaignHomeScreen from './src/screens/CampaignHomeScreen';
 import ChapterDetailScreen from './src/screens/ChapterDetailScreen';
 import ActOnboardingModal from './src/screens/ActOnboardingModal';
 import CampaignBriefingModal from './src/screens/CampaignBriefingModal';
+import {
+  SCREENS,
+  HOME_STATES,
+  createInitialState,
+  navigationReducer,
+  actions,
+} from './src/navigation';
 
-// Navigation screens
-const SCREENS = {
-  SELECT: 'select',
-  INTRO: 'intro',
-  BRIEFING: 'briefing',
-  ONBOARDING: 'onboarding',
-  HOME: 'home',
-  CHAPTER: 'chapter',
-};
-
-// Main app content with navigation
+// Main app content with navigation state machine
 const AppContent = () => {
   const {
     campaign,
@@ -26,106 +23,91 @@ const AppContent = () => {
     needsOnboarding,
     isChapterComplete,
     completeBriefing,
-    isBriefingComplete,
   } = useCampaign();
-  const [currentScreen, setCurrentScreen] = useState(
-    campaign ? SCREENS.HOME : SCREENS.SELECT
-  );
-  const [selectedCampaign, setSelectedCampaign] = useState(null);
-  const [selectedChapter, setSelectedChapter] = useState(null);
-  const [onboardingChapter, setOnboardingChapter] = useState(null);
 
-  // Update screen when campaign loads
-  React.useEffect(() => {
-    if (campaign && currentScreen === SCREENS.SELECT) {
-      setCurrentScreen(SCREENS.HOME);
+  // Initialize state machine
+  const [navState, dispatch] = useReducer(
+    navigationReducer,
+    campaign,
+    (camp) => createInitialState(!!camp)
+  );
+
+  // Update screen when campaign loads (handles app restart with existing campaign)
+  useEffect(() => {
+    if (campaign && navState.screen === SCREENS.SELECT) {
+      dispatch({ type: 'SET_STATE', payload: { screen: SCREENS.HOME } });
     }
   }, [campaign]);
 
-  // Navigation handlers
+  // ============================================================
+  // EVENT HANDLERS
+  // ============================================================
+
+  // Campaign Selection
   const handleSelectCampaign = (campaignData) => {
-    setSelectedCampaign(campaignData);
-    setCurrentScreen(SCREENS.INTRO);
+    dispatch(actions.selectCampaign(campaignData));
   };
 
   const handleBeginJourney = () => {
-    // Go to briefing flow (new 3-step campaign briefing)
-    setCurrentScreen(SCREENS.BRIEFING);
+    dispatch(actions.beginJourney());
   };
 
   const handleBackToSelect = () => {
-    setSelectedCampaign(null);
-    setCurrentScreen(SCREENS.SELECT);
+    dispatch(actions.backToSelect());
   };
 
-  const handleBackFromChapter = () => {
-    setSelectedChapter(null);
-    setCurrentScreen(SCREENS.HOME);
-  };
-
-  // Briefing (new 3-step flow) handlers
+  // Briefing
   const handleBriefingComplete = (briefingData) => {
     completeBriefing(briefingData);
-    // Also mark first chapter as onboarded since briefing replaces it
     completeActOnboarding('chapter-1', []);
-    setCurrentScreen(SCREENS.HOME);
+    dispatch(actions.completeBriefing());
   };
 
   const handleBriefingClose = () => {
-    // Go back to intro if closing briefing without completing
-    setCurrentScreen(SCREENS.INTRO);
+    dispatch(actions.backToIntro());
   };
 
   const handleBriefingSkip = () => {
-    // DEV: Skip briefing and go directly to Act 1
     startCampaign();
-    // Mark chapter 1 as onboarded with test answers
     completeActOnboarding('chapter-1', [0, 2, 2, 0, 1]);
-    setCurrentScreen(SCREENS.HOME);
+    dispatch(actions.skipBriefing());
   };
 
-  // Legacy act onboarding handlers (for subsequent chapters)
+  // Onboarding
   const handleOnboardingComplete = (answers) => {
-    if (onboardingChapter) {
-      completeActOnboarding(onboardingChapter.id, answers);
+    if (navState.context.onboardingChapter) {
+      completeActOnboarding(navState.context.onboardingChapter.id, answers);
     }
-    setOnboardingChapter(null);
-    setCurrentScreen(SCREENS.HOME);
+    dispatch(actions.completeOnboarding());
   };
 
   const handleOnboardingClose = () => {
-    // If closing onboarding without completing:
-    // - For first chapter (no campaign yet started), go back to intro
-    // - For subsequent chapters, go back to home
-    const isFirstChapter = onboardingChapter?.id === 'chapter-1';
-    setOnboardingChapter(null);
-    setCurrentScreen(campaign && !isFirstChapter ? SCREENS.HOME : SCREENS.INTRO);
+    dispatch(actions.closeOnboarding());
   };
 
-  const handleViewChapter = (chapter) => {
-    // Check if this chapter needs onboarding (when switching to a new unlocked chapter)
+  // Chapter Navigation - now just dispatches, logic handled by CampaignHomeScreen
+  const handleViewChapter = (chapter, skipOnboardingCheck = false) => {
+    // Check if this chapter needs onboarding
     const chapterIndex = campaign?.chapters.findIndex(c => c.id === chapter.id) ?? 0;
-    const isLocked = chapterIndex > 0 && campaign?.chapters.slice(0, chapterIndex).some(c => !isChapterComplete(c));
+    const isLocked = chapterIndex > 0 &&
+      campaign?.chapters.slice(0, chapterIndex).some(c => !isChapterComplete(c));
 
-    if (!isLocked && needsOnboarding(chapter.id)) {
-      setOnboardingChapter(chapter);
-      setCurrentScreen(SCREENS.ONBOARDING);
+    if (!skipOnboardingCheck && !isLocked && needsOnboarding(chapter.id)) {
+      dispatch(actions.startOnboarding(chapter));
     } else {
-      setSelectedChapter(chapter);
-      setCurrentScreen(SCREENS.HOME);
+      dispatch(actions.viewChapter(chapter));
     }
   };
 
-  const handleClearSelectedChapter = () => {
-    setSelectedChapter(null);
-  };
-
   const handleExitCampaign = () => {
-    setCurrentScreen(SCREENS.SELECT);
+    dispatch(actions.exitCampaign());
   };
 
-  // Render current screen
-  switch (currentScreen) {
+  // ============================================================
+  // RENDER
+  // ============================================================
+
+  switch (navState.screen) {
     case SCREENS.SELECT:
       return (
         <CampaignSelectScreen
@@ -136,7 +118,7 @@ const AppContent = () => {
     case SCREENS.INTRO:
       return (
         <CampaignIntroScreen
-          campaign={selectedCampaign}
+          campaign={navState.context.selectedCampaign}
           onBegin={handleBeginJourney}
           onBack={handleBackToSelect}
         />
@@ -154,7 +136,7 @@ const AppContent = () => {
     case SCREENS.ONBOARDING:
       return (
         <ActOnboardingModal
-          chapter={onboardingChapter}
+          chapter={navState.context.onboardingChapter}
           onComplete={handleOnboardingComplete}
           onClose={handleOnboardingClose}
         />
@@ -163,8 +145,8 @@ const AppContent = () => {
     case SCREENS.CHAPTER:
       return (
         <ChapterDetailScreen
-          chapter={selectedChapter}
-          onBack={handleBackFromChapter}
+          chapter={navState.context.selectedChapter}
+          onBack={() => dispatch(actions.viewChapter(null))}
         />
       );
 
@@ -172,10 +154,10 @@ const AppContent = () => {
     default:
       return (
         <CampaignHomeScreen
+          navState={navState}
+          dispatch={dispatch}
           onViewAct={handleViewChapter}
           onBack={handleExitCampaign}
-          selectedChapter={selectedChapter}
-          onClearSelectedChapter={handleClearSelectedChapter}
         />
       );
   }

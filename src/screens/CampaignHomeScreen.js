@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useCampaign } from '../campaign';
+import { HOME_STATES, actions } from '../navigation';
 import CircularProgress from '../components/CircularProgress';
 import * as Haptics from 'expo-haptics';
 import QuestInfoModal from './QuestInfoModal';
@@ -19,11 +20,13 @@ import QuestActionModal from './QuestActionModal';
 import { MemoryStampModal, StampRevealModal, generateStamp, getStampInsights } from '../memories';
 
 const { width } = Dimensions.get('window');
-// Match StreakCard sizing exactly
 const CARD_SIZE = (width - 48) / 2;
 const CIRCLE_SIZE = CARD_SIZE - 16;
 
-// Quest Circle Card - matches StreakCard styling exactly
+// ============================================================
+// Quest Circle Component
+// ============================================================
+
 const QuestCircle = ({ quest, onPress, isLocked = false }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const isComplete = quest.completedSegments >= quest.maxSegments;
@@ -53,7 +56,6 @@ const QuestCircle = ({ quest, onPress, isLocked = false }) => {
   const handlePress = () => {
     if (isLocked) return;
     if (!isComplete && onPress) {
-      // Check if about to complete
       if (quest.completedSegments === quest.maxSegments - 1) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
@@ -71,11 +73,8 @@ const QuestCircle = ({ quest, onPress, isLocked = false }) => {
         activeOpacity={isLocked ? 1 : 1}
         disabled={isComplete || isLocked}
       >
-        {/* Progress Ring */}
         <View style={[styles.circleContainer, isLocked && styles.lockedCircle]}>
-          {/* Complete background - solid white circle */}
           {isComplete && !isLocked && <View style={styles.completeBackground} />}
-
           <CircularProgress
             size={CIRCLE_SIZE}
             strokeWidth={10}
@@ -84,8 +83,6 @@ const QuestCircle = ({ quest, onPress, isLocked = false }) => {
             completedSegments={isLocked ? 0 : quest.completedSegments}
             color={isComplete ? '#4CAF50' : isLocked ? 'rgba(255, 255, 255, 0.3)' : '#fff'}
           />
-
-          {/* Icon in center */}
           <View style={styles.iconContainer}>
             {isLocked ? (
               <Text style={styles.lockedIcon}>🔒</Text>
@@ -95,8 +92,6 @@ const QuestCircle = ({ quest, onPress, isLocked = false }) => {
               </Text>
             )}
           </View>
-
-          {/* Progress badge inside circle at bottom */}
           {!isLocked && (
             <View style={styles.progressBadge}>
               <Text style={[styles.progressText, isComplete && styles.progressTextComplete]}>
@@ -105,8 +100,6 @@ const QuestCircle = ({ quest, onPress, isLocked = false }) => {
             </View>
           )}
         </View>
-
-        {/* Quest Name */}
         <View style={styles.questInfo}>
           <Text
             style={[
@@ -124,216 +117,163 @@ const QuestCircle = ({ quest, onPress, isLocked = false }) => {
   );
 };
 
-// Act indicator - shows stamp when completed
-const ActIndicator = ({
-  chapter,
-  chapterIndex,
-  isCurrentAct,
-  isCompleted,
-  isLocked,
-  stamp,
-  onPress,
-  onStampPress,
-}) => {
-  const handlePress = () => {
-    if (isLocked) return;
-    if (isCompleted && stamp && onStampPress) {
-      onStampPress();
-    } else {
-      onPress();
-    }
-  };
+// ============================================================
+// Main Component
+// ============================================================
 
-  return (
-    <TouchableOpacity
-      style={[
-        styles.actDot,
-        isCurrentAct && styles.actDotActive,
-        isCompleted && styles.actDotCompleted,
-        isLocked && styles.actDotLocked,
-      ]}
-      onPress={handlePress}
-      disabled={isLocked}
-      activeOpacity={0.7}
-    >
-      {isCompleted && stamp ? (
-        <Text style={styles.actStampIcon}>{stamp.actIcon}</Text>
-      ) : isCompleted ? (
-        <Text style={styles.actDotText}>✓</Text>
-      ) : isLocked ? (
-        <Text style={styles.actDotTextLocked}>?</Text>
-      ) : (
-        <Text style={styles.actDotText}>{chapterIndex + 1}</Text>
-      )}
-    </TouchableOpacity>
-  );
-};
-
-const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelectedChapter }) => {
+const CampaignHomeScreen = ({ navState, dispatch, onViewAct, onBack }) => {
   const {
     campaign,
     incrementQuest,
     checkChapterLocked,
     isChapterComplete,
-    isQuestComplete,
     getCampaignProgress,
-    getChapterProgress,
-    justCompletedChapter,
-    clearChapterCelebration,
     needsQuestInfo,
     markQuestInfoSeen,
     actOnboardingState,
+    justCompletedChapter,
+    clearChapterCelebration,
     devCompleteChapter,
   } = useCampaign();
 
-  const [showCelebration, setShowCelebration] = useState(false);
-  const [showStampCollecting, setShowStampCollecting] = useState(false);
-  const [showUnlockOverlay, setShowUnlockOverlay] = useState(false);
-  const [unlockingAct, setUnlockingAct] = useState(null);
-  const [showQuestInfo, setShowQuestInfo] = useState(false);
-  const [questInfoFirstTime, setQuestInfoFirstTime] = useState(false);
-  const [viewingChapter, setViewingChapter] = useState(null);
-  const [showQuestAction, setShowQuestAction] = useState(false);
-  const [selectedQuest, setSelectedQuest] = useState(null);
-  const [selectedStamp, setSelectedStamp] = useState(null);
-
-  // Animation for stamp collecting
+  // Animation refs
   const stampCollectAnim = useRef(new Animated.Value(0)).current;
 
-  // Find current (first incomplete) chapter
+  // Get state from navState
+  const { homeState, context } = navState;
+  const { selectedChapter, selectedQuest, selectedStamp, questInfoFirstTime } = context;
+
+  // Find current chapter
   const currentChapterIndex = campaign?.chapters.findIndex(
     (ch) => !isChapterComplete(ch)
   ) ?? 0;
   const currentChapter = campaign?.chapters[currentChapterIndex];
 
-  // Determine which chapter to display (current or selected)
+  // Determine displayed chapter
   const displayedChapterIndex = selectedChapter
     ? campaign?.chapters.findIndex((ch) => ch.id === selectedChapter.id) ?? currentChapterIndex
     : currentChapterIndex;
   const displayedChapter = selectedChapter || currentChapter;
   const isViewingLockedChapter = selectedChapter && checkChapterLocked(displayedChapterIndex);
 
-  // Check if we need to show quest info on first visit (after onboarding completes)
-  useEffect(() => {
-    if (displayedChapter && needsQuestInfo(displayedChapter.id)) {
-      setQuestInfoFirstTime(true);
-      setViewingChapter(displayedChapter);
-      setShowQuestInfo(true);
-    }
-  }, [displayedChapter?.id, actOnboardingState]);
+  // ============================================================
+  // EFFECTS
+  // ============================================================
 
-  // Handle chapter completion - show stamp reveal
+  // Show quest info on first visit after onboarding
   useEffect(() => {
-    if (justCompletedChapter) {
-      setShowCelebration(true);
+    if (
+      homeState === HOME_STATES.QUESTS &&
+      displayedChapter &&
+      needsQuestInfo(displayedChapter.id)
+    ) {
+      dispatch(actions.openQuestInfo(true));
+    }
+  }, [displayedChapter?.id, actOnboardingState, homeState]);
+
+  // Handle chapter completion - trigger stamp reveal
+  useEffect(() => {
+    if (justCompletedChapter && homeState === HOME_STATES.QUESTS) {
+      dispatch(actions.actCompleted(justCompletedChapter));
     }
   }, [justCompletedChapter]);
 
-  // Handle stamp reveal continue - show stamp collecting animation then navigate to locked act
-  const handleStampRevealContinue = () => {
-    setShowCelebration(false);
-
-    // Find the next chapter
-    const completedIndex = campaign?.chapters.findIndex(ch => ch.id === justCompletedChapter);
-
-    if (completedIndex !== -1 && completedIndex < campaign.chapters.length - 1) {
-      const nextChapter = campaign.chapters[completedIndex + 1];
-
-      // Show stamp collecting animation
-      setShowStampCollecting(true);
+  // Handle stamp collecting animation
+  useEffect(() => {
+    if (homeState === HOME_STATES.STAMP_COLLECTING) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-      // Animate stamp to collection
       stampCollectAnim.setValue(0);
+
       Animated.timing(stampCollectAnim, {
         toValue: 1,
         duration: 800,
         useNativeDriver: true,
       }).start(() => {
-        setShowStampCollecting(false);
-        clearChapterCelebration();
+        // Find next chapter
+        const completedIndex = campaign?.chapters.findIndex(
+          ch => ch.id === context.completedChapterId
+        );
 
-        // Navigate to next act and show unlock overlay
-        setUnlockingAct({
-          actNumber: completedIndex + 2,
-          actTitle: nextChapter.title,
-          actSubtitle: nextChapter.subtitle,
-          chapter: nextChapter,
-        });
-        setShowUnlockOverlay(true);
-
-        // Navigate to the act (it will show with overlay on top)
-        onViewAct(nextChapter);
+        if (completedIndex !== -1 && completedIndex < campaign.chapters.length - 1) {
+          const nextChapter = campaign.chapters[completedIndex + 1];
+          dispatch(actions.stampAnimationDone(nextChapter));
+        } else {
+          // Last act - just go back to quests
+          clearChapterCelebration();
+          dispatch(actions.closeQuestInfo()); // Reset to QUESTS state
+        }
       });
-    } else {
-      // Last act completed - just clear celebration
-      clearChapterCelebration();
     }
+  }, [homeState]);
+
+  // ============================================================
+  // HANDLERS
+  // ============================================================
+
+  const handleStampRevealContinue = () => {
+    dispatch(actions.continueFromStamp());
   };
 
-  // Handle unlock overlay - dismiss overlay and proceed
   const handleUnlockAct = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setShowUnlockOverlay(false);
-
-    // Navigate to onboarding for the new act
-    if (unlockingAct?.chapter) {
-      setTimeout(() => {
-        onViewAct(unlockingAct.chapter);
-      }, 300);
-    }
-    setUnlockingAct(null);
+    clearChapterCelebration();
+    dispatch(actions.unlockAct());
   };
 
   const handleQuestPress = (quest) => {
     if (displayedChapter && !isViewingLockedChapter) {
-      setSelectedQuest(quest);
-      setShowQuestAction(true);
+      dispatch(actions.openQuestAction(quest));
     }
   };
 
   const handleQuestActionSubmit = (answer) => {
     if (selectedQuest && displayedChapter) {
-      // Increment the quest progress after submitting
       incrementQuest(displayedChapter.id, selectedQuest.id);
     }
-    setShowQuestAction(false);
-    setSelectedQuest(null);
+    dispatch(actions.closeQuestAction());
   };
 
   const handleQuestActionClose = () => {
-    setShowQuestAction(false);
-    setSelectedQuest(null);
+    dispatch(actions.closeQuestAction());
   };
 
   const handleHelpPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setQuestInfoFirstTime(false);
-    setViewingChapter(displayedChapter);
-    setShowQuestInfo(true);
+    dispatch(actions.openQuestInfo(false));
   };
 
   const handleQuestInfoDismiss = () => {
-    setShowQuestInfo(false);
-    if (questInfoFirstTime && viewingChapter) {
-      markQuestInfoSeen(viewingChapter.id);
+    if (questInfoFirstTime && displayedChapter) {
+      markQuestInfoSeen(displayedChapter.id);
     }
-    setViewingChapter(null);
-    setQuestInfoFirstTime(false);
+    dispatch(actions.closeQuestInfo());
   };
 
   const handleBackToCurrentAct = () => {
-    if (onClearSelectedChapter) {
-      onClearSelectedChapter();
-    }
+    dispatch(actions.clearSelectedChapter());
   };
+
+  const handleStampPress = (stamp) => {
+    dispatch(actions.viewStamp(stamp));
+  };
+
+  const handleStampClose = () => {
+    dispatch(actions.closeStamp());
+  };
+
+  // ============================================================
+  // RENDER
+  // ============================================================
 
   if (!campaign) return null;
 
   const overallProgress = getCampaignProgress();
-
-  // Get quests from displayed chapter
   const displayedQuests = displayedChapter?.quests || [];
+
+  // Get completed chapter info for stamp reveal
+  const completedChapterIndex = context.completedChapterId
+    ? campaign?.chapters.findIndex(ch => ch.id === context.completedChapterId)
+    : -1;
 
   return (
     <LinearGradient
@@ -362,7 +302,7 @@ const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelecte
             </View>
           </View>
 
-          {/* Current Act Info with Stamp Row */}
+          {/* Current Act Banner */}
           {displayedChapter && (
             <View style={styles.currentActBanner}>
               <TouchableOpacity
@@ -386,7 +326,7 @@ const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelecte
                 </View>
               </TouchableOpacity>
 
-              {/* Stamp Row - only show if at least one stamp earned */}
+              {/* Stamp Row */}
               {campaign.chapters.some(ch =>
                 isChapterComplete(ch) && actOnboardingState[ch.id]?.answers
               ) && (
@@ -398,12 +338,11 @@ const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelecte
                     const answers = actOnboardingState[chapter.id]?.answers;
                     const stamp = answers ? generateStamp(chapter.id, answers) : null;
                     const isEarned = isComplete && stamp;
-                    const isJustEarned = justCompletedChapter === chapter.id;
 
-                    const handleStampPress = () => {
+                    const onPress = () => {
                       if (isEarned) {
                         const insights = getStampInsights(chapter.id, answers);
-                        setSelectedStamp({
+                        handleStampPress({
                           ...stamp,
                           insights,
                           chapterNumber: index + 1,
@@ -422,7 +361,7 @@ const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelecte
                           isEarned && styles.stampDotComplete,
                           isLocked && styles.stampDotLocked,
                         ]}
-                        onPress={handleStampPress}
+                        onPress={onPress}
                         disabled={isLocked}
                         activeOpacity={0.7}
                       >
@@ -441,7 +380,7 @@ const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelecte
             </View>
           )}
 
-          {/* Back to current act button when viewing other chapter */}
+          {/* Back to current act button */}
           {selectedChapter && displayedChapterIndex !== currentChapterIndex && (
             <TouchableOpacity
               style={styles.backToCurrentButton}
@@ -487,22 +426,21 @@ const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelecte
           )}
         </View>
 
-        {/* Chapter Complete Celebration */}
+        {/* ============================================================ */}
+        {/* MODALS & OVERLAYS - Controlled by homeState */}
+        {/* ============================================================ */}
+
         {/* Stamp Reveal Modal */}
         <StampRevealModal
-          visible={showCelebration && !!justCompletedChapter}
-          chapterId={justCompletedChapter}
-          chapterNumber={
-            justCompletedChapter
-              ? campaign?.chapters.findIndex(ch => ch.id === justCompletedChapter) + 1
-              : 1
-          }
-          answers={justCompletedChapter ? actOnboardingState[justCompletedChapter]?.answers : null}
+          visible={homeState === HOME_STATES.STAMP_REVEAL}
+          chapterId={context.completedChapterId}
+          chapterNumber={completedChapterIndex + 1}
+          answers={context.completedChapterId ? actOnboardingState[context.completedChapterId]?.answers : null}
           onContinue={handleStampRevealContinue}
         />
 
-        {/* Stamp Collecting Animation Overlay */}
-        {showStampCollecting && (
+        {/* Stamp Collecting Animation */}
+        {homeState === HOME_STATES.STAMP_COLLECTING && (
           <View style={styles.collectingOverlay}>
             <Animated.View
               style={[
@@ -535,16 +473,18 @@ const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelecte
           </View>
         )}
 
-        {/* Act Unlock Overlay - shows on top of the act's quests */}
-        {showUnlockOverlay && unlockingAct && (
+        {/* Act Unlock Overlay */}
+        {homeState === HOME_STATES.ACT_UNLOCK && context.pendingUnlockChapter && (
           <View style={styles.unlockOverlay}>
             <View style={styles.unlockContent}>
               <View style={styles.unlockIconContainer}>
                 <Text style={styles.unlockLockIcon}>🔓</Text>
               </View>
               <Text style={styles.unlockReadyText}>Ready for</Text>
-              <Text style={styles.unlockActNumber}>Act {unlockingAct.actNumber}</Text>
-              <Text style={styles.unlockActTitle}>{unlockingAct.actTitle}</Text>
+              <Text style={styles.unlockActNumber}>
+                Act {campaign.chapters.findIndex(c => c.id === context.pendingUnlockChapter.id) + 1}
+              </Text>
+              <Text style={styles.unlockActTitle}>{context.pendingUnlockChapter.title}</Text>
               <TouchableOpacity
                 style={styles.unlockButton}
                 onPress={handleUnlockAct}
@@ -557,16 +497,16 @@ const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelecte
         )}
 
         {/* Quest Info Modal */}
-        {showQuestInfo && viewingChapter && (
+        {homeState === HOME_STATES.QUEST_INFO && displayedChapter && (
           <QuestInfoModal
-            chapter={viewingChapter}
+            chapter={displayedChapter}
             onDismiss={handleQuestInfoDismiss}
             isFirstTime={questInfoFirstTime}
           />
         )}
 
         {/* Quest Action Modal */}
-        {showQuestAction && selectedQuest && (
+        {homeState === HOME_STATES.QUEST_ACTION && selectedQuest && (
           <QuestActionModal
             quest={selectedQuest}
             onSubmit={handleQuestActionSubmit}
@@ -576,14 +516,18 @@ const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelecte
 
         {/* Memory Stamp Modal */}
         <MemoryStampModal
-          visible={selectedStamp !== null}
+          visible={homeState === HOME_STATES.STAMP_DETAIL}
           stamp={selectedStamp}
-          onClose={() => setSelectedStamp(null)}
+          onClose={handleStampClose}
         />
       </SafeAreaView>
     </LinearGradient>
   );
 };
+
+// ============================================================
+// STYLES
+// ============================================================
 
 const styles = StyleSheet.create({
   container: {
@@ -592,7 +536,6 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  // Header
   header: {
     paddingHorizontal: 20,
     paddingTop: 8,
@@ -644,7 +587,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  // Current Act Banner
   currentActBanner: {
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     borderRadius: 14,
@@ -675,7 +617,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '300',
   },
-  // Stamp Row in Act Banner
   stampRow: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -716,31 +657,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
-  actProgressBarContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-    gap: 10,
-  },
-  actProgressBarBackground: {
-    flex: 1,
-    height: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  actProgressBarFill: {
-    height: '100%',
-    backgroundColor: '#fff',
-    borderRadius: 3,
-  },
-  actProgressText: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 12,
-    fontWeight: '600',
-    minWidth: 36,
-    textAlign: 'right',
-  },
   actSubtitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -770,7 +686,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  // Quest Grid - matches StreakCard layout
   scrollView: {
     flex: 1,
   },
@@ -866,51 +781,10 @@ const styles = StyleSheet.create({
   lockedQuestName: {
     opacity: 0.5,
   },
-  // Bottom Nav
   bottomNav: {
     alignItems: 'center',
     paddingVertical: 16,
     paddingBottom: 8,
-  },
-  actIndicators: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 8,
-  },
-  actDot: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  actDotActive: {
-    backgroundColor: '#fff',
-  },
-  actDotCompleted: {
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  actDotLocked: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  actDotText: {
-    color: '#C96FB9',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  actDotTextLocked: {
-    color: 'rgba(255, 255, 255, 0.3)',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  actStampIcon: {
-    fontSize: 20,
   },
   actHint: {
     color: 'rgba(255, 255, 255, 0.5)',
@@ -1009,38 +883,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: '700',
-  },
-  // Celebration
-  celebrationOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  celebrationCard: {
-    backgroundColor: '#fff',
-    borderRadius: 24,
-    paddingHorizontal: 48,
-    paddingVertical: 32,
-    alignItems: 'center',
-  },
-  celebrationEmoji: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  celebrationTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#333',
-    marginBottom: 8,
-  },
-  celebrationSubtitle: {
-    fontSize: 16,
-    color: '#666',
   },
 });
 
