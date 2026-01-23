@@ -17,6 +17,7 @@ import * as Haptics from 'expo-haptics';
 import QuestInfoModal from './QuestInfoModal';
 import QuestActionModal from './QuestActionModal';
 import { MemoryStampModal, StampRevealModal, generateStamp, getStampInsights } from '../memories';
+import { ActUnlockModal } from '../components';
 
 const { width } = Dimensions.get('window');
 // Match StreakCard sizing exactly
@@ -187,12 +188,18 @@ const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelecte
   } = useCampaign();
 
   const [showCelebration, setShowCelebration] = useState(false);
+  const [showStampCollecting, setShowStampCollecting] = useState(false);
+  const [showActUnlock, setShowActUnlock] = useState(false);
+  const [nextActInfo, setNextActInfo] = useState(null);
   const [showQuestInfo, setShowQuestInfo] = useState(false);
   const [questInfoFirstTime, setQuestInfoFirstTime] = useState(false);
   const [viewingChapter, setViewingChapter] = useState(null);
   const [showQuestAction, setShowQuestAction] = useState(false);
   const [selectedQuest, setSelectedQuest] = useState(null);
   const [selectedStamp, setSelectedStamp] = useState(null);
+
+  // Animation for stamp collecting
+  const stampCollectAnim = useRef(new Animated.Value(0)).current;
 
   // Find current (first incomplete) chapter
   const currentChapterIndex = campaign?.chapters.findIndex(
@@ -223,21 +230,54 @@ const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelecte
     }
   }, [justCompletedChapter]);
 
-  // Handle stamp reveal continue
+  // Handle stamp reveal continue - show stamp collecting animation then act unlock
   const handleStampRevealContinue = () => {
     setShowCelebration(false);
 
-    // Find the next chapter and trigger onboarding if needed
+    // Find the next chapter
     const completedIndex = campaign?.chapters.findIndex(ch => ch.id === justCompletedChapter);
-    clearChapterCelebration();
 
     if (completedIndex !== -1 && completedIndex < campaign.chapters.length - 1) {
       const nextChapter = campaign.chapters[completedIndex + 1];
-      // Trigger onViewAct to check for onboarding
+
+      // Show stamp collecting animation
+      setShowStampCollecting(true);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+      // Animate stamp to collection
+      stampCollectAnim.setValue(0);
+      Animated.timing(stampCollectAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }).start(() => {
+        // After animation, show act unlock modal
+        setShowStampCollecting(false);
+        setNextActInfo({
+          actNumber: completedIndex + 2,
+          actTitle: nextChapter.title,
+          chapter: nextChapter,
+        });
+        setShowActUnlock(true);
+      });
+    } else {
+      // Last act completed - just clear celebration
+      clearChapterCelebration();
+    }
+  };
+
+  // Handle act unlock continue - navigate to next act
+  const handleActUnlockContinue = () => {
+    setShowActUnlock(false);
+    clearChapterCelebration();
+
+    if (nextActInfo?.chapter) {
+      // Navigate to next act with onboarding check
       setTimeout(() => {
-        onViewAct(nextChapter);
+        onViewAct(nextActInfo.chapter);
       }, 300);
     }
+    setNextActInfo(null);
   };
 
   const handleQuestPress = (quest) => {
@@ -454,6 +494,48 @@ const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelecte
           }
           answers={justCompletedChapter ? actOnboardingState[justCompletedChapter]?.answers : null}
           onContinue={handleStampRevealContinue}
+        />
+
+        {/* Stamp Collecting Animation Overlay */}
+        {showStampCollecting && (
+          <View style={styles.collectingOverlay}>
+            <Animated.View
+              style={[
+                styles.collectingStamp,
+                {
+                  opacity: stampCollectAnim.interpolate({
+                    inputRange: [0, 0.3, 0.7, 1],
+                    outputRange: [1, 1, 0.5, 0],
+                  }),
+                  transform: [
+                    {
+                      scale: stampCollectAnim.interpolate({
+                        inputRange: [0, 0.5, 1],
+                        outputRange: [1, 0.8, 0.3],
+                      }),
+                    },
+                    {
+                      translateY: stampCollectAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, -200],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              <Text style={styles.collectingText}>Stamp Added!</Text>
+              <Text style={styles.collectingEmoji}>✨</Text>
+            </Animated.View>
+          </View>
+        )}
+
+        {/* Act Unlock Modal */}
+        <ActUnlockModal
+          visible={showActUnlock}
+          actNumber={nextActInfo?.actNumber || 2}
+          actTitle={nextActInfo?.actTitle || ''}
+          onContinue={handleActUnlockContinue}
         />
 
         {/* Quest Info Modal */}
@@ -827,6 +909,28 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 11,
     fontWeight: '600',
+  },
+  // Stamp Collecting Animation
+  collectingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  collectingStamp: {
+    alignItems: 'center',
+  },
+  collectingText: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 8,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  collectingEmoji: {
+    fontSize: 48,
   },
   // Celebration
   celebrationOverlay: {

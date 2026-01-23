@@ -13,6 +13,7 @@ export { default as EmojiPicker } from './EmojiPicker';
 export { default as ChapterCard } from './ChapterCard';
 export { default as QuestCard } from './QuestCard';
 export { default as GiftRevealModal } from './GiftRevealModal';
+export { default as ActUnlockModal } from './ActUnlockModal';
 
 // Common reusable components
 export {
