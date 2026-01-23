@@ -167,7 +167,7 @@ const ThinkingMessage = ({ text, isVisible }) => {
   );
 };
 
-const CampaignBriefingModal = ({ onComplete, onClose }) => {
+const CampaignBriefingModal = ({ onComplete, onClose, onSkip }) => {
   const [currentStep, setCurrentStep] = useState(STEPS.CHAT);
   const [currentPromptIndex, setCurrentPromptIndex] = useState(0);
   const [chatResponses, setChatResponses] = useState({});
@@ -583,9 +583,11 @@ const CampaignBriefingModal = ({ onComplete, onClose }) => {
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
               <Text style={styles.closeButtonText}>✕</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.skipButton} onPress={handleSkipChat}>
-              <Text style={styles.skipButtonText}>Skip</Text>
-            </TouchableOpacity>
+            {onSkip && (
+              <TouchableOpacity style={styles.skipButton} onPress={onSkip}>
+                <Text style={styles.skipButtonText}>Skip All</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 

@@ -316,6 +316,37 @@ export const CampaignProvider = ({ children }) => {
   };
 
   /**
+   * DEV ONLY: Complete all quests in a chapter to test stamp reveal
+   */
+  const devCompleteChapter = (chapterId) => {
+    if (!campaign) return;
+
+    setCampaign(prev => {
+      const newCampaign = { ...prev };
+      const chapterIndex = newCampaign.chapters.findIndex(c => c.id === chapterId);
+
+      if (chapterIndex === -1) return prev;
+
+      const chapter = { ...newCampaign.chapters[chapterIndex] };
+
+      // Complete all quests
+      chapter.quests = chapter.quests.map(quest => ({
+        ...quest,
+        completedSegments: quest.maxSegments,
+      }));
+
+      newCampaign.chapters = [...newCampaign.chapters];
+      newCampaign.chapters[chapterIndex] = chapter;
+
+      // Trigger chapter completion celebration
+      setJustCompletedChapter(chapter.id);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      return newCampaign;
+    });
+  };
+
+  /**
    * Get chapter by ID
    */
   const getChapter = (chapterId) => {
@@ -361,6 +392,8 @@ export const CampaignProvider = ({ children }) => {
     isChapterComplete: (chapter) => isChapterComplete(chapter),
     isQuestComplete: (quest) => isQuestComplete(quest),
     isCampaignComplete: () => campaign ? isCampaignComplete(campaign) : false,
+    // DEV helpers
+    devCompleteChapter,
   };
 
   return (

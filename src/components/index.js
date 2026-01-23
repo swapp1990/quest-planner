@@ -12,6 +12,7 @@ export { default as StreakCard } from './StreakCard';
 export { default as EmojiPicker } from './EmojiPicker';
 export { default as ChapterCard } from './ChapterCard';
 export { default as QuestCard } from './QuestCard';
+export { default as GiftRevealModal } from './GiftRevealModal';
 
 // Common reusable components
 export {

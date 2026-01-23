@@ -16,7 +16,7 @@ import CircularProgress from '../components/CircularProgress';
 import * as Haptics from 'expo-haptics';
 import QuestInfoModal from './QuestInfoModal';
 import QuestActionModal from './QuestActionModal';
-import { MemoryStampModal, generateStamp, getStampInsights } from '../memories';
+import { MemoryStampModal, StampRevealModal, generateStamp, getStampInsights } from '../memories';
 
 const { width } = Dimensions.get('window');
 // Match StreakCard sizing exactly
@@ -183,9 +183,9 @@ const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelecte
     needsQuestInfo,
     markQuestInfoSeen,
     actOnboardingState,
+    devCompleteChapter,
   } = useCampaign();
 
-  const [celebrationAnim] = useState(new Animated.Value(0));
   const [showCelebration, setShowCelebration] = useState(false);
   const [showQuestInfo, setShowQuestInfo] = useState(false);
   const [questInfoFirstTime, setQuestInfoFirstTime] = useState(false);
@@ -216,39 +216,29 @@ const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelecte
     }
   }, [displayedChapter?.id, actOnboardingState]);
 
-  // Handle chapter completion celebration
+  // Handle chapter completion - show stamp reveal
   useEffect(() => {
     if (justCompletedChapter) {
       setShowCelebration(true);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Animated.sequence([
-        Animated.timing(celebrationAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.delay(2500),
-        Animated.timing(celebrationAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        setShowCelebration(false);
-        clearChapterCelebration();
-
-        // Find the next chapter and trigger onboarding if needed
-        const completedIndex = campaign?.chapters.findIndex(ch => ch.id === justCompletedChapter);
-        if (completedIndex !== -1 && completedIndex < campaign.chapters.length - 1) {
-          const nextChapter = campaign.chapters[completedIndex + 1];
-          // Trigger onViewAct to check for onboarding
-          setTimeout(() => {
-            onViewAct(nextChapter);
-          }, 300);
-        }
-      });
     }
   }, [justCompletedChapter]);
+
+  // Handle stamp reveal continue
+  const handleStampRevealContinue = () => {
+    setShowCelebration(false);
+
+    // Find the next chapter and trigger onboarding if needed
+    const completedIndex = campaign?.chapters.findIndex(ch => ch.id === justCompletedChapter);
+    clearChapterCelebration();
+
+    if (completedIndex !== -1 && completedIndex < campaign.chapters.length - 1) {
+      const nextChapter = campaign.chapters[completedIndex + 1];
+      // Trigger onViewAct to check for onboarding
+      setTimeout(() => {
+        onViewAct(nextChapter);
+      }, 300);
+    }
+  };
 
   const handleQuestPress = (quest) => {
     if (displayedChapter && !isViewingLockedChapter) {
@@ -379,39 +369,26 @@ const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelecte
                     };
 
                     return (
-                      <Animated.View
+                      <TouchableOpacity
                         key={chapter.id}
                         style={[
-                          isJustEarned && {
-                            transform: [{
-                              scale: celebrationAnim.interpolate({
-                                inputRange: [0, 0.5, 1],
-                                outputRange: [1, 1.3, 1],
-                              })
-                            }],
-                          },
+                          styles.stampDot,
+                          isCurrent && !isEarned && styles.stampDotCurrent,
+                          isEarned && styles.stampDotComplete,
+                          isLocked && styles.stampDotLocked,
                         ]}
+                        onPress={handleStampPress}
+                        disabled={isLocked}
+                        activeOpacity={0.7}
                       >
-                        <TouchableOpacity
-                          style={[
-                            styles.stampDot,
-                            isCurrent && !isEarned && styles.stampDotCurrent,
-                            isEarned && styles.stampDotComplete,
-                            isLocked && styles.stampDotLocked,
-                          ]}
-                          onPress={handleStampPress}
-                          disabled={isLocked}
-                          activeOpacity={0.7}
-                        >
-                          {isEarned ? (
-                            <Text style={styles.stampIcon}>{stamp.actIcon}</Text>
-                          ) : isLocked ? (
-                            <Text style={styles.stampLockIcon}>🔒</Text>
-                          ) : (
-                            <Text style={styles.stampNumber}>{index + 1}</Text>
-                          )}
-                        </TouchableOpacity>
-                      </Animated.View>
+                        {isEarned ? (
+                          <Text style={styles.stampIcon}>{stamp.actIcon}</Text>
+                        ) : isLocked ? (
+                          <Text style={styles.stampLockIcon}>🔒</Text>
+                        ) : (
+                          <Text style={styles.stampNumber}>{index + 1}</Text>
+                        )}
+                      </TouchableOpacity>
                     );
                   })}
                 </View>
@@ -454,35 +431,30 @@ const CampaignHomeScreen = ({ onViewAct, onBack, selectedChapter, onClearSelecte
           <Text style={styles.actHint}>
             {displayedChapter ? `${displayedChapter.subtitle}` : 'Journey Complete'}
           </Text>
+          {/* DEV: Complete chapter button */}
+          {displayedChapter && !isChapterComplete(displayedChapter) && !isViewingLockedChapter && (
+            <TouchableOpacity
+              style={styles.devCompleteButton}
+              onPress={() => devCompleteChapter(displayedChapter.id)}
+            >
+              <Text style={styles.devCompleteText}>DEV: Complete Act</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Chapter Complete Celebration */}
-        {showCelebration && (
-          <Animated.View
-            style={[
-              styles.celebrationOverlay,
-              {
-                opacity: celebrationAnim,
-                transform: [
-                  {
-                    scale: celebrationAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.8, 1],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
-            <View style={styles.celebrationCard}>
-              <Text style={styles.celebrationEmoji}>🎉</Text>
-              <Text style={styles.celebrationTitle}>Act Complete!</Text>
-              <Text style={styles.celebrationSubtitle}>
-                New chapter unlocked
-              </Text>
-            </View>
-          </Animated.View>
-        )}
+        {/* Stamp Reveal Modal */}
+        <StampRevealModal
+          visible={showCelebration && !!justCompletedChapter}
+          chapterId={justCompletedChapter}
+          chapterNumber={
+            justCompletedChapter
+              ? campaign?.chapters.findIndex(ch => ch.id === justCompletedChapter) + 1
+              : 1
+          }
+          answers={justCompletedChapter ? actOnboardingState[justCompletedChapter]?.answers : null}
+          onContinue={handleStampRevealContinue}
+        />
 
         {/* Quest Info Modal */}
         {showQuestInfo && viewingChapter && (
@@ -843,6 +815,18 @@ const styles = StyleSheet.create({
   actHint: {
     color: 'rgba(255, 255, 255, 0.5)',
     fontSize: 12,
+  },
+  devCompleteButton: {
+    marginTop: 8,
+    backgroundColor: 'rgba(255, 100, 100, 0.3)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  devCompleteText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
   },
   // Celebration
   celebrationOverlay: {

@@ -76,6 +76,14 @@ const AppContent = () => {
     setCurrentScreen(SCREENS.INTRO);
   };
 
+  const handleBriefingSkip = () => {
+    // DEV: Skip briefing and go directly to Act 1
+    startCampaign();
+    // Mark chapter 1 as onboarded with test answers
+    completeActOnboarding('chapter-1', [0, 2, 2, 0, 1]);
+    setCurrentScreen(SCREENS.HOME);
+  };
+
   // Legacy act onboarding handlers (for subsequent chapters)
   const handleOnboardingComplete = (answers) => {
     if (onboardingChapter) {
@@ -139,6 +147,7 @@ const AppContent = () => {
         <CampaignBriefingModal
           onComplete={handleBriefingComplete}
           onClose={handleBriefingClose}
+          onSkip={handleBriefingSkip}
         />
       );
 
