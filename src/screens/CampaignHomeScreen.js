@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,11 @@ import { StatusBar } from 'expo-status-bar';
 import { useCampaign } from '../campaign';
 import { HOME_STATES, actions } from '../navigation';
 import CircularProgress from '../components/CircularProgress';
+import {
+  StampCollection,
+  ActIndicator,
+  CollectionAddAnimation,
+} from '../components';
 import * as Haptics from 'expo-haptics';
 import QuestInfoModal from './QuestInfoModal';
 import QuestActionModal from './QuestActionModal';
@@ -129,6 +134,7 @@ const CampaignHomeScreen = ({ navState, dispatch, onViewAct, onBack }) => {
     isChapterComplete,
     getCampaignProgress,
     needsQuestInfo,
+    needsOnboarding,
     markQuestInfoSeen,
     actOnboardingState,
     justCompletedChapter,
@@ -136,14 +142,14 @@ const CampaignHomeScreen = ({ navState, dispatch, onViewAct, onBack }) => {
     devCompleteChapter,
   } = useCampaign();
 
-  // Animation refs
-  const stampCollectAnim = useRef(new Animated.Value(0)).current;
+  // Track stamp animation data
+  const [animatingStamp, setAnimatingStamp] = useState(null);
 
   // Get state from navState
   const { homeState, context } = navState;
   const { selectedChapter, selectedQuest, selectedStamp, questInfoFirstTime } = context;
 
-  // Find current chapter
+  // Find current chapter (first incomplete one)
   const currentChapterIndex = campaign?.chapters.findIndex(
     (ch) => !isChapterComplete(ch)
   ) ?? 0;
@@ -154,7 +160,32 @@ const CampaignHomeScreen = ({ navState, dispatch, onViewAct, onBack }) => {
     ? campaign?.chapters.findIndex((ch) => ch.id === selectedChapter.id) ?? currentChapterIndex
     : currentChapterIndex;
   const displayedChapter = selectedChapter || currentChapter;
-  const isViewingLockedChapter = selectedChapter && checkChapterLocked(displayedChapterIndex);
+
+  // Check if chapter is locked (previous chapters not complete)
+  const isChapterLocked = (index) => checkChapterLocked(index);
+
+  // Check if chapter needs onboarding (unlocked but not onboarded yet)
+  const chapterNeedsOnboarding = displayedChapter && needsOnboarding(displayedChapter.id);
+
+  // Quests should be hidden if: locked OR needs onboarding
+  const shouldHideQuests = isChapterLocked(displayedChapterIndex) || chapterNeedsOnboarding;
+
+  // Build earned stamps array for StampCollection
+  const earnedStamps = campaign?.chapters
+    .map((chapter, index) => {
+      const isComplete = isChapterComplete(chapter);
+      const answers = actOnboardingState[chapter.id]?.answers;
+      if (isComplete && answers) {
+        const stamp = generateStamp(chapter.id, answers);
+        return {
+          ...stamp,
+          chapterIndex: index,
+          insights: getStampInsights(chapter.id, answers),
+        };
+      }
+      return null;
+    })
+    .filter(Boolean) || [];
 
   // ============================================================
   // EFFECTS
@@ -165,11 +196,12 @@ const CampaignHomeScreen = ({ navState, dispatch, onViewAct, onBack }) => {
     if (
       homeState === HOME_STATES.QUESTS &&
       displayedChapter &&
+      !shouldHideQuests &&
       needsQuestInfo(displayedChapter.id)
     ) {
       dispatch(actions.openQuestInfo(true));
     }
-  }, [displayedChapter?.id, actOnboardingState, homeState]);
+  }, [displayedChapter?.id, actOnboardingState, homeState, shouldHideQuests]);
 
   // Handle chapter completion - trigger stamp reveal
   useEffect(() => {
@@ -178,33 +210,18 @@ const CampaignHomeScreen = ({ navState, dispatch, onViewAct, onBack }) => {
     }
   }, [justCompletedChapter]);
 
-  // Handle stamp collecting animation
+  // Handle stamp collecting animation state
   useEffect(() => {
-    if (homeState === HOME_STATES.STAMP_COLLECTING) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      stampCollectAnim.setValue(0);
-
-      Animated.timing(stampCollectAnim, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }).start(() => {
-        // Find next chapter
-        const completedIndex = campaign?.chapters.findIndex(
-          ch => ch.id === context.completedChapterId
-        );
-
-        if (completedIndex !== -1 && completedIndex < campaign.chapters.length - 1) {
-          const nextChapter = campaign.chapters[completedIndex + 1];
-          dispatch(actions.stampAnimationDone(nextChapter));
-        } else {
-          // Last act - just go back to quests
-          clearChapterCelebration();
-          dispatch(actions.closeQuestInfo()); // Reset to QUESTS state
-        }
-      });
+    if (homeState === HOME_STATES.STAMP_COLLECTING && context.completedChapterId) {
+      const answers = actOnboardingState[context.completedChapterId]?.answers;
+      if (answers) {
+        const stamp = generateStamp(context.completedChapterId, answers);
+        setAnimatingStamp(stamp);
+      }
+    } else {
+      setAnimatingStamp(null);
     }
-  }, [homeState]);
+  }, [homeState, context.completedChapterId]);
 
   // ============================================================
   // HANDLERS
@@ -214,14 +231,37 @@ const CampaignHomeScreen = ({ navState, dispatch, onViewAct, onBack }) => {
     dispatch(actions.continueFromStamp());
   };
 
+  const handleCollectionAnimationComplete = () => {
+    // Find next chapter
+    const completedIndex = campaign?.chapters.findIndex(
+      ch => ch.id === context.completedChapterId
+    );
+
+    if (completedIndex !== -1 && completedIndex < campaign.chapters.length - 1) {
+      const nextChapter = campaign.chapters[completedIndex + 1];
+      dispatch(actions.stampAnimationDone(nextChapter));
+    } else {
+      // Last act - just go back to quests
+      clearChapterCelebration();
+      dispatch(actions.closeQuestInfo());
+    }
+  };
+
   const handleUnlockAct = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     clearChapterCelebration();
     dispatch(actions.unlockAct());
   };
 
+  const handleActPress = (actIndex) => {
+    const chapter = campaign?.chapters[actIndex];
+    if (chapter) {
+      onViewAct(chapter);
+    }
+  };
+
   const handleQuestPress = (quest) => {
-    if (displayedChapter && !isViewingLockedChapter) {
+    if (displayedChapter && !shouldHideQuests) {
       dispatch(actions.openQuestAction(quest));
     }
   };
@@ -302,81 +342,43 @@ const CampaignHomeScreen = ({ navState, dispatch, onViewAct, onBack }) => {
             </View>
           </View>
 
+          {/* Stamp Collection - only shows when stamps earned */}
+          <StampCollection
+            stamps={earnedStamps}
+            onStampPress={(stamp) => handleStampPress({
+              ...stamp,
+              chapterNumber: stamp.chapterIndex + 1,
+            })}
+          />
+
           {/* Current Act Banner */}
           {displayedChapter && (
             <View style={styles.currentActBanner}>
-              <TouchableOpacity
-                style={[isViewingLockedChapter && styles.lockedActBanner]}
-                onPress={() => onViewAct(displayedChapter)}
-                activeOpacity={0.8}
-              >
-                <View style={styles.actBannerContent}>
-                  <View style={styles.actInfo}>
-                    <View style={styles.actSubtitleRow}>
-                      <Text style={styles.actSubtitle}>{displayedChapter.subtitle}</Text>
-                      {isViewingLockedChapter && (
-                        <View style={styles.lockedBadge}>
-                          <Text style={styles.lockedBadgeText}>LOCKED</Text>
-                        </View>
-                      )}
-                    </View>
-                    <Text style={styles.actTitle}>{displayedChapter.title}</Text>
+              <View style={styles.actBannerContent}>
+                <View style={styles.actInfo}>
+                  <View style={styles.actSubtitleRow}>
+                    <Text style={styles.actSubtitle}>{displayedChapter.subtitle}</Text>
+                    {shouldHideQuests && (
+                      <View style={styles.lockedBadge}>
+                        <Text style={styles.lockedBadgeText}>
+                          {chapterNeedsOnboarding ? 'NEW' : 'LOCKED'}
+                        </Text>
+                      </View>
+                    )}
                   </View>
-                  <Text style={styles.actChevron}>›</Text>
+                  <Text style={styles.actTitle}>{displayedChapter.title}</Text>
                 </View>
-              </TouchableOpacity>
+              </View>
 
-              {/* Stamp Row */}
-              {campaign.chapters.some(ch =>
-                isChapterComplete(ch) && actOnboardingState[ch.id]?.answers
-              ) && (
-                <View style={styles.stampRow}>
-                  {campaign.chapters.map((chapter, index) => {
-                    const isComplete = isChapterComplete(chapter);
-                    const isLocked = checkChapterLocked(index);
-                    const isCurrent = index === displayedChapterIndex;
-                    const answers = actOnboardingState[chapter.id]?.answers;
-                    const stamp = answers ? generateStamp(chapter.id, answers) : null;
-                    const isEarned = isComplete && stamp;
-
-                    const onPress = () => {
-                      if (isEarned) {
-                        const insights = getStampInsights(chapter.id, answers);
-                        handleStampPress({
-                          ...stamp,
-                          insights,
-                          chapterNumber: index + 1,
-                        });
-                      } else if (!isLocked) {
-                        onViewAct(chapter);
-                      }
-                    };
-
-                    return (
-                      <TouchableOpacity
-                        key={chapter.id}
-                        style={[
-                          styles.stampDot,
-                          isCurrent && !isEarned && styles.stampDotCurrent,
-                          isEarned && styles.stampDotComplete,
-                          isLocked && styles.stampDotLocked,
-                        ]}
-                        onPress={onPress}
-                        disabled={isLocked}
-                        activeOpacity={0.7}
-                      >
-                        {isEarned ? (
-                          <Text style={styles.stampIcon}>{stamp.actIcon}</Text>
-                        ) : isLocked ? (
-                          <Text style={styles.stampLockIcon}>🔒</Text>
-                        ) : (
-                          <Text style={styles.stampNumber}>{index + 1}</Text>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              )}
+              {/* Act Indicator - numbered buttons */}
+              <View style={styles.actIndicatorContainer}>
+                <ActIndicator
+                  totalActs={campaign.chapters.length}
+                  currentActIndex={displayedChapterIndex}
+                  isActUnlocked={(index) => !checkChapterLocked(index)}
+                  onActPress={handleActPress}
+                />
+              </View>
             </View>
           )}
 
@@ -392,22 +394,36 @@ const CampaignHomeScreen = ({ navState, dispatch, onViewAct, onBack }) => {
           )}
         </View>
 
-        {/* Quest Circles Grid */}
+        {/* Quest Circles Grid - hidden if quests not unlocked */}
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.questGrid}>
-            {displayedQuests.map((quest) => (
-              <QuestCircle
-                key={quest.id}
-                quest={quest}
-                onPress={() => handleQuestPress(quest)}
-                isLocked={isViewingLockedChapter}
-              />
-            ))}
-          </View>
+          {shouldHideQuests ? (
+            <View style={styles.lockedContent}>
+              <Text style={styles.lockedEmoji}>🔒</Text>
+              <Text style={styles.lockedTitle}>
+                {chapterNeedsOnboarding ? 'Complete Onboarding' : 'Complete Previous Acts'}
+              </Text>
+              <Text style={styles.lockedSubtitle}>
+                {chapterNeedsOnboarding
+                  ? 'Answer a few questions to unlock this act'
+                  : 'Finish the current act to unlock this one'}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.questGrid}>
+              {displayedQuests.map((quest) => (
+                <QuestCircle
+                  key={quest.id}
+                  quest={quest}
+                  onPress={() => handleQuestPress(quest)}
+                  isLocked={false}
+                />
+              ))}
+            </View>
+          )}
         </ScrollView>
 
         {/* Bottom hint */}
@@ -416,7 +432,7 @@ const CampaignHomeScreen = ({ navState, dispatch, onViewAct, onBack }) => {
             {displayedChapter ? `${displayedChapter.subtitle}` : 'Journey Complete'}
           </Text>
           {/* DEV: Complete chapter button */}
-          {displayedChapter && !isChapterComplete(displayedChapter) && !isViewingLockedChapter && (
+          {displayedChapter && !isChapterComplete(displayedChapter) && !shouldHideQuests && (
             <TouchableOpacity
               style={styles.devCompleteButton}
               onPress={() => devCompleteChapter(displayedChapter.id)}
@@ -439,39 +455,13 @@ const CampaignHomeScreen = ({ navState, dispatch, onViewAct, onBack }) => {
           onContinue={handleStampRevealContinue}
         />
 
-        {/* Stamp Collecting Animation */}
-        {homeState === HOME_STATES.STAMP_COLLECTING && (
-          <View style={styles.collectingOverlay}>
-            <Animated.View
-              style={[
-                styles.collectingStamp,
-                {
-                  opacity: stampCollectAnim.interpolate({
-                    inputRange: [0, 0.3, 0.7, 1],
-                    outputRange: [1, 1, 0.5, 0],
-                  }),
-                  transform: [
-                    {
-                      scale: stampCollectAnim.interpolate({
-                        inputRange: [0, 0.5, 1],
-                        outputRange: [1, 0.8, 0.3],
-                      }),
-                    },
-                    {
-                      translateY: stampCollectAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, -200],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            >
-              <Text style={styles.collectingText}>Stamp Added!</Text>
-              <Text style={styles.collectingEmoji}>✨</Text>
-            </Animated.View>
-          </View>
-        )}
+        {/* Collection Add Animation - stamp flying to collection */}
+        <CollectionAddAnimation
+          visible={homeState === HOME_STATES.STAMP_COLLECTING}
+          icon={animatingStamp?.actIcon || '🏆'}
+          label={animatingStamp?.label}
+          onComplete={handleCollectionAnimationComplete}
+        />
 
         {/* Act Unlock Overlay */}
         {homeState === HOME_STATES.ACT_UNLOCK && context.pendingUnlockChapter && (
@@ -587,6 +577,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  // Act Banner
   currentActBanner: {
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     borderRadius: 14,
@@ -612,58 +603,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  actChevron: {
-    color: 'rgba(255, 255, 255, 0.5)',
-    fontSize: 24,
-    fontWeight: '300',
-  },
-  stampRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  stampDot: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  stampDotCurrent: {
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderWidth: 2,
-    borderColor: '#fff',
-  },
-  stampDotComplete: {
-    backgroundColor: '#fff',
-  },
-  stampDotLocked: {
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  stampIcon: {
-    fontSize: 20,
-  },
-  stampLockIcon: {
-    fontSize: 14,
-    opacity: 0.4,
-  },
-  stampNumber: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-  },
   actSubtitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  lockedActBanner: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   lockedBadge: {
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
@@ -677,6 +620,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.5,
   },
+  actIndicatorContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+  },
   backToCurrentButton: {
     marginTop: 10,
     alignSelf: 'flex-start',
@@ -686,12 +635,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
+  // Quest Grid
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingTop: 20,
     paddingBottom: 20,
+    flexGrow: 1,
   },
   questGrid: {
     flexDirection: 'row',
@@ -781,6 +732,31 @@ const styles = StyleSheet.create({
   lockedQuestName: {
     opacity: 0.5,
   },
+  // Locked Content (when quests hidden)
+  lockedContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  lockedEmoji: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  lockedTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  lockedSubtitle: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  // Bottom Nav
   bottomNav: {
     alignItems: 'center',
     paddingVertical: 16,
@@ -801,28 +777,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 11,
     fontWeight: '600',
-  },
-  // Stamp Collecting Animation
-  collectingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  collectingStamp: {
-    alignItems: 'center',
-  },
-  collectingText: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 8,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-  },
-  collectingEmoji: {
-    fontSize: 48,
   },
   // Unlock Overlay
   unlockOverlay: {

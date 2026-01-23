@@ -14,6 +14,9 @@ export { default as ChapterCard } from './ChapterCard';
 export { default as QuestCard } from './QuestCard';
 export { default as GiftRevealModal } from './GiftRevealModal';
 export { default as ActUnlockModal } from './ActUnlockModal';
+export { default as StampCollection } from './StampCollection';
+export { default as ActIndicator } from './ActIndicator';
+export { default as CollectionAddAnimation } from './CollectionAddAnimation';
 
 // Common reusable components
 export {
