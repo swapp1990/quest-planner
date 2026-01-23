@@ -26,28 +26,21 @@ import {
   PlanOptionCard,
 } from '../briefing/components';
 
-import { BRIEFING_PROMPTS, BRIEF_THINKING_MESSAGES } from '../briefing/briefingPromptsData';
 import {
+  getBriefingData,
   mapResponsesToConstraints,
-  getConstraintOrder,
+  generateQuestsForAct,
   getDefaultConstraints,
-  CONSTRAINT_LABELS,
-} from '../briefing/constraintMapper';
-import { PLAN_OPTIONS, generateQuestsForPlan } from '../briefing/planGenerator';
+} from '../briefing/actBriefingData';
 
 // Generate random constraints for skip functionality
-const generateRandomConstraints = () => {
-  const options = {
-    tripSize: ['mini', 'standard', 'big'],
-    spendVibe: ['save', 'balanced', 'treat'],
-    soloConfidence: ['nervous', 'ready', 'bold'],
-    planningEnergy: ['low', 'med', 'high'],
-    structure: ['planned', 'flexible', 'spontaneous'],
-  };
-
+const generateRandomConstraints = (chapterId) => {
+  const actData = getBriefingData(chapterId);
   const randomConstraints = {};
-  Object.entries(options).forEach(([key, values]) => {
-    randomConstraints[key] = values[Math.floor(Math.random() * values.length)];
+
+  actData.constraintOrder.forEach(constraintName => {
+    const options = Object.keys(actData.constraints[constraintName].options);
+    randomConstraints[constraintName] = options[Math.floor(Math.random() * options.length)];
   });
 
   return randomConstraints;
@@ -68,21 +61,6 @@ const PLAN_PHASES = {
   GENERATING: 'generating',
   PREVIEW_QUESTS: 'preview_quests',
 };
-
-// Gradient colors by step
-const STEP_GRADIENTS = {
-  [STEPS.CHAT]: ['#5B9FED', '#4A90E2', '#3B7DD8', '#2E6BC4'],
-  [STEPS.BRIEF]: ['#8B7FD6', '#7B6FC6', '#6B5FB6', '#5B4FA6'],
-  [STEPS.PLAN]: ['#4CAF50', '#43A047', '#388E3C', '#2E7D32'],
-};
-
-// AI thinking messages for quest generation
-const QUEST_THINKING_MESSAGES = [
-  { delay: 0, text: 'Analyzing your preferences...' },
-  { delay: 800, text: 'Crafting personalized quests...' },
-  { delay: 1600, text: 'Balancing challenge levels...' },
-  { delay: 2400, text: 'Finalizing your adventure...' },
-];
 
 // Pulsing dot for thinking indicator
 const PulsingDot = ({ delay = 0 }) => {
@@ -167,7 +145,18 @@ const ThinkingMessage = ({ text, isVisible }) => {
   );
 };
 
-const CampaignBriefingModal = ({ onComplete, onClose, onSkip }) => {
+/**
+ * CampaignBriefingModal - Reusable for any act
+ *
+ * @param {string} chapterId - The chapter ID (e.g., 'chapter-1', 'chapter-2')
+ * @param {function} onComplete - Called with briefing data when complete
+ * @param {function} onClose - Called when user closes the modal
+ * @param {function} onSkip - Optional, called when user skips
+ */
+const CampaignBriefingModal = ({ chapterId = 'chapter-1', onComplete, onClose, onSkip }) => {
+  // Get act-specific data
+  const actData = getBriefingData(chapterId);
+
   const [currentStep, setCurrentStep] = useState(STEPS.CHAT);
   const [currentPromptIndex, setCurrentPromptIndex] = useState(0);
   const [chatResponses, setChatResponses] = useState({});
@@ -189,7 +178,7 @@ const CampaignBriefingModal = ({ onComplete, onClose, onSkip }) => {
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowTyping(false);
-      setChatHistory([{ type: 'ai', message: BRIEFING_PROMPTS[0].aiMessage }]);
+      setChatHistory([{ type: 'ai', message: actData.prompts[0].aiMessage }]);
       setTimeout(() => setShowChips(true), 300);
     }, 1000);
 
@@ -207,7 +196,7 @@ const CampaignBriefingModal = ({ onComplete, onClose, onSkip }) => {
 
   // Handle chat option selection
   const handleOptionSelect = (option) => {
-    const currentPrompt = BRIEFING_PROMPTS[currentPromptIndex];
+    const currentPrompt = actData.prompts[currentPromptIndex];
 
     // Store response
     const newResponses = {
@@ -225,20 +214,20 @@ const CampaignBriefingModal = ({ onComplete, onClose, onSkip }) => {
     setShowChips(false);
 
     // Check if more prompts
-    if (currentPromptIndex < BRIEFING_PROMPTS.length - 1) {
+    if (currentPromptIndex < actData.prompts.length - 1) {
       // Show typing, then next prompt
       setShowTyping(true);
 
       setTimeout(() => {
         setShowTyping(false);
-        const nextPrompt = BRIEFING_PROMPTS[currentPromptIndex + 1];
+        const nextPrompt = actData.prompts[currentPromptIndex + 1];
         setChatHistory((prev) => [...prev, { type: 'ai', message: nextPrompt.aiMessage }]);
         setCurrentPromptIndex(currentPromptIndex + 1);
         setTimeout(() => setShowChips(true), 300);
       }, 800);
     } else {
       // All prompts answered, transition to Brief step
-      const mappedConstraints = mapResponsesToConstraints(newResponses);
+      const mappedConstraints = mapResponsesToConstraints(chapterId, newResponses);
       setConstraints(mappedConstraints);
 
       setTimeout(() => {
@@ -260,9 +249,9 @@ const CampaignBriefingModal = ({ onComplete, onClose, onSkip }) => {
   // Handle skip chat - randomize constraints and go to Brief
   const handleSkipChat = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const randomConstraints = generateRandomConstraints();
+    const randomConstraints = generateRandomConstraints(chapterId);
     setConstraints(randomConstraints);
-    setChatResponses({}); // No chat responses when skipped
+    setChatResponses({});
     transitionToStep(STEPS.BRIEF);
   };
 
@@ -308,7 +297,7 @@ const CampaignBriefingModal = ({ onComplete, onClose, onSkip }) => {
     setVisibleThinkingMessages([]);
 
     // Animate thinking messages
-    QUEST_THINKING_MESSAGES.forEach((msg, index) => {
+    actData.thinkingMessages.forEach((msg, index) => {
       setTimeout(() => {
         setVisibleThinkingMessages((prev) => [...prev, index]);
       }, msg.delay);
@@ -316,7 +305,7 @@ const CampaignBriefingModal = ({ onComplete, onClose, onSkip }) => {
 
     // Generate quests after thinking animation
     setTimeout(() => {
-      const quests = generateQuestsForPlan(selectedPlan, constraints);
+      const quests = generateQuestsForAct(chapterId, selectedPlan, constraints);
       setGeneratedQuests(quests);
       setPlanPhase(PLAN_PHASES.PREVIEW_QUESTS);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -335,6 +324,8 @@ const CampaignBriefingModal = ({ onComplete, onClose, onSkip }) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     onComplete({
+      chapterId,
+      actNumber: actData.actNumber,
       chatResponses,
       constraints,
       selectedPlan,
@@ -343,9 +334,23 @@ const CampaignBriefingModal = ({ onComplete, onClose, onSkip }) => {
     });
   };
 
+  // Get gradient colors based on current step
+  const getGradientColors = () => {
+    switch (currentStep) {
+      case STEPS.CHAT:
+        return actData.gradientColors.chat;
+      case STEPS.BRIEF:
+        return actData.gradientColors.brief;
+      case STEPS.PLAN:
+        return actData.gradientColors.plan;
+      default:
+        return actData.gradientColors.chat;
+    }
+  };
+
   // Render Step 1: Chat
   const renderChatStep = () => {
-    const currentPrompt = BRIEFING_PROMPTS[currentPromptIndex];
+    const currentPrompt = actData.prompts[currentPromptIndex];
 
     return (
       <KeyboardAvoidingView
@@ -402,8 +407,6 @@ const CampaignBriefingModal = ({ onComplete, onClose, onSkip }) => {
 
   // Render Step 2: Brief
   const renderBriefStep = () => {
-    const constraintOrder = getConstraintOrder();
-
     return (
       <ScrollView
         style={styles.stepContainer}
@@ -418,8 +421,8 @@ const CampaignBriefingModal = ({ onComplete, onClose, onSkip }) => {
         </View>
 
         <View style={styles.constraintsContainer}>
-          {constraintOrder.map((constraintName, index) => {
-            const constraintDef = CONSTRAINT_LABELS[constraintName];
+          {actData.constraintOrder.map((constraintName, index) => {
+            const constraintDef = actData.constraints[constraintName];
             const currentValue = constraints[constraintName];
 
             return (
@@ -448,7 +451,7 @@ const CampaignBriefingModal = ({ onComplete, onClose, onSkip }) => {
 
   // Render Step 3: Plan (with phases)
   const renderPlanStep = () => {
-    const plans = Object.values(PLAN_OPTIONS);
+    const plans = Object.values(actData.plans);
 
     // Phase 1: Select Plan
     if (planPhase === PLAN_PHASES.SELECT_PLAN) {
@@ -502,7 +505,7 @@ const CampaignBriefingModal = ({ onComplete, onClose, onSkip }) => {
             <Text style={styles.thinkingTitle}>Creating Your Quests</Text>
 
             <View style={styles.thinkingMessages}>
-              {QUEST_THINKING_MESSAGES.map((msg, index) => (
+              {actData.thinkingMessages.map((msg, index) => (
                 <ThinkingMessage
                   key={index}
                   text={msg.text}
@@ -517,7 +520,7 @@ const CampaignBriefingModal = ({ onComplete, onClose, onSkip }) => {
 
     // Phase 3: Preview Quests
     if (planPhase === PLAN_PHASES.PREVIEW_QUESTS) {
-      const planInfo = PLAN_OPTIONS[selectedPlan];
+      const planInfo = actData.plans[selectedPlan];
 
       return (
         <ScrollView
@@ -571,12 +574,18 @@ const CampaignBriefingModal = ({ onComplete, onClose, onSkip }) => {
     return null;
   };
 
-  const currentGradient = STEP_GRADIENTS[currentStep];
+  const currentGradient = getGradientColors();
 
   return (
     <LinearGradient colors={currentGradient} style={styles.container}>
       <StatusBar style="light" />
       <SafeAreaView style={styles.safeArea}>
+        {/* Act header */}
+        <View style={styles.actHeader}>
+          <Text style={styles.actIcon}>{actData.icon}</Text>
+          <Text style={styles.actTitle}>{actData.title}</Text>
+        </View>
+
         {/* Header buttons */}
         {currentStep === STEPS.CHAT && (
           <View style={styles.headerButtons}>
@@ -615,6 +624,22 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+  },
+  actHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 16,
+    paddingBottom: 8,
+    gap: 8,
+  },
+  actIcon: {
+    fontSize: 24,
+  },
+  actTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
   },
   headerButtons: {
     position: 'absolute',

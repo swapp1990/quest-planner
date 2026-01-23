@@ -4,7 +4,6 @@ import CampaignSelectScreen from './src/screens/CampaignSelectScreen';
 import CampaignIntroScreen from './src/screens/CampaignIntroScreen';
 import CampaignHomeScreen from './src/screens/CampaignHomeScreen';
 import ChapterDetailScreen from './src/screens/ChapterDetailScreen';
-import ActOnboardingModal from './src/screens/ActOnboardingModal';
 import CampaignBriefingModal from './src/screens/CampaignBriefingModal';
 import {
   SCREENS,
@@ -56,33 +55,42 @@ const AppContent = () => {
     dispatch(actions.backToSelect());
   };
 
-  // Briefing
+  // Briefing - now used for all acts
   const handleBriefingComplete = (briefingData) => {
-    completeBriefing(briefingData);
-    completeActOnboarding('chapter-1', []);
+    const chapterId = briefingData.chapterId || 'chapter-1';
+
+    // For Act 1, use completeBriefing which also initializes quests
+    if (chapterId === 'chapter-1') {
+      completeBriefing(briefingData);
+    }
+
+    // Mark the act as onboarded
+    completeActOnboarding(chapterId, []);
     dispatch(actions.completeBriefing());
   };
 
   const handleBriefingClose = () => {
-    dispatch(actions.backToIntro());
+    // If we're onboarding a specific chapter, go back to home
+    if (navState.context.onboardingChapter) {
+      dispatch(actions.closeOnboarding());
+    } else {
+      dispatch(actions.backToIntro());
+    }
   };
 
   const handleBriefingSkip = () => {
-    startCampaign();
-    completeActOnboarding('chapter-1', [0, 2, 2, 0, 1]);
-    dispatch(actions.skipBriefing());
-  };
+    const chapterId = navState.context.onboardingChapter?.id || 'chapter-1';
 
-  // Onboarding
-  const handleOnboardingComplete = (answers) => {
-    if (navState.context.onboardingChapter) {
-      completeActOnboarding(navState.context.onboardingChapter.id, answers);
+    if (chapterId === 'chapter-1') {
+      startCampaign();
     }
-    dispatch(actions.completeOnboarding());
-  };
+    completeActOnboarding(chapterId, [0, 2, 2, 0, 1]);
 
-  const handleOnboardingClose = () => {
-    dispatch(actions.closeOnboarding());
+    if (navState.context.onboardingChapter) {
+      dispatch(actions.completeOnboarding());
+    } else {
+      dispatch(actions.skipBriefing());
+    }
   };
 
   // Chapter Navigation - now just dispatches, logic handled by CampaignHomeScreen
@@ -127,6 +135,7 @@ const AppContent = () => {
     case SCREENS.BRIEFING:
       return (
         <CampaignBriefingModal
+          chapterId="chapter-1"
           onComplete={handleBriefingComplete}
           onClose={handleBriefingClose}
           onSkip={handleBriefingSkip}
@@ -134,11 +143,13 @@ const AppContent = () => {
       );
 
     case SCREENS.ONBOARDING:
+      // Use the same briefing modal for all acts
       return (
-        <ActOnboardingModal
-          chapter={navState.context.onboardingChapter}
-          onComplete={handleOnboardingComplete}
-          onClose={handleOnboardingClose}
+        <CampaignBriefingModal
+          chapterId={navState.context.onboardingChapter?.id || 'chapter-1'}
+          onComplete={handleBriefingComplete}
+          onClose={handleBriefingClose}
+          onSkip={handleBriefingSkip}
         />
       );
 

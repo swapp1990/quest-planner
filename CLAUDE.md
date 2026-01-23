@@ -1,7 +1,7 @@
-# CLAUDE.md - React Native iOS App
+# CLAUDE.md - Quest Planner
 
 ## Project Overview
-React Native app built with Expo SDK 54 for iOS development.
+Quest Planner - A React Native app built with Expo SDK 54 for iOS. Gamified goal tracking with campaigns, acts, and quests.
 
 ## Requirements
 - Node.js 20+ (use `nvm use 20` before running commands)
@@ -14,7 +14,7 @@ React Native app built with Expo SDK 54 for iOS development.
 nvm use 20
 
 # Build for iOS device (interactive - sets up Apple credentials)
-cd HelloWorld && eas build --profile development --platform ios
+eas build --profile development --platform ios
 ```
 
 ## Development Commands
@@ -73,8 +73,8 @@ Design tokens in `src/theme/index.js`:
 5. Edit code - changes auto-reload
 
 ## iOS Config
-- Bundle ID: `com.swapnilsawant.helloworld`
-- EAS Project: `@swapp1990/HelloWorld`
+- Bundle ID: `com.swapnilsawant.questplanner`
+- EAS Project: `@swapp1990/quest-planner`
 
 ## In-App Purchases (RevenueCat)
 Files in `src/purchases/`:
@@ -84,7 +84,7 @@ Files in `src/purchases/`:
 
 **Setup Required:**
 1. Create RevenueCat account at https://app.revenuecat.com
-2. Add iOS app with bundle ID `com.swapnilsawant.helloworld`
+2. Add iOS app with bundle ID `com.swapnilsawant.questplanner`
 3. Get Public SDK Key (starts with `appl_`) and update `config.js`
 4. Create entitlement "premium" and configure offerings
 5. Create products in App Store Connect and link to RevenueCat

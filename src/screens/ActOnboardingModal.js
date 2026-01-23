@@ -1,3 +1,9 @@
+/**
+ * @deprecated This component is deprecated. Use CampaignBriefingModal with chapterId prop instead.
+ * All acts now use the same briefing flow (chat → constraints → plan) for consistency.
+ * See src/briefing/actBriefingData.js for act-specific prompts and data.
+ */
+
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,

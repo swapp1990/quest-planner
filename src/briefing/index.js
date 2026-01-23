@@ -1,6 +1,15 @@
 // Briefing Module Exports
 
-// Data
+// Act-specific briefing data (new unified approach)
+export {
+  ACT_BRIEFING_DATA,
+  getBriefingData,
+  mapResponsesToConstraints as mapActResponsesToConstraints,
+  generateQuestsForAct,
+  getDefaultConstraints as getActDefaultConstraints,
+} from './actBriefingData';
+
+// Legacy data (kept for backwards compatibility)
 export {
   BRIEFING_PROMPTS,
   BRIEF_THINKING_MESSAGES,

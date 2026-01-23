@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "HelloWorld",
-    "slug": "HelloWorld",
-    "scheme": "helloworld",
+    "name": "Quest Planner",
+    "slug": "quest-planner",
+    "scheme": "questplanner",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.swapnilsawant.helloworld",
+      "bundleIdentifier": "com.swapnilsawant.questplanner",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
