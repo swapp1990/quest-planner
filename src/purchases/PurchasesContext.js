@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { AppState } from 'react-native';
 import Purchases from 'react-native-purchases';
 import { REVENUECAT_API_KEY, ENTITLEMENTS } from './config';
 
@@ -11,10 +12,31 @@ export const PurchasesProvider = ({ userId, children }) => {
   const [offerings, setOfferings] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const appState = useRef(AppState.currentState);
 
   // Initialize RevenueCat
   useEffect(() => {
     initializePurchases();
+
+    // Set up listener for customer info changes
+    let customerInfoUpdateListener;
+    try {
+      customerInfoUpdateListener = Purchases.addCustomerInfoUpdateListener((info) => {
+        setCustomerInfo(info);
+        const activeEntitlements = Object.keys(info.entitlements.active);
+        const hasPremium = info.entitlements.active[ENTITLEMENTS.PREMIUM] !== undefined;
+        const hasAnyEntitlement = activeEntitlements.length > 0;
+        setIsPremium(hasPremium || hasAnyEntitlement);
+      });
+    } catch (err) {
+      console.warn('Failed to add customer info listener:', err);
+    }
+
+    return () => {
+      if (customerInfoUpdateListener?.remove) {
+        customerInfoUpdateListener.remove();
+      }
+    };
   }, []);
 
   // Handle user login/logout
@@ -44,7 +66,6 @@ export const PurchasesProvider = ({ userId, children }) => {
         await Purchases.logIn(userId);
         await refreshCustomerInfo();
       }
-      // Don't call logOut - RevenueCat handles anonymous users automatically
     } catch (err) {
       console.error('Failed to handle user change:', err);
     }
@@ -67,9 +88,10 @@ export const PurchasesProvider = ({ userId, children }) => {
       const info = await Purchases.getCustomerInfo();
       setCustomerInfo(info);
 
-      // Check if user has premium entitlement
+      const activeEntitlements = Object.keys(info.entitlements.active);
       const hasPremium = info.entitlements.active[ENTITLEMENTS.PREMIUM] !== undefined;
-      setIsPremium(hasPremium);
+      const hasAnyEntitlement = activeEntitlements.length > 0;
+      setIsPremium(hasPremium || hasAnyEntitlement);
 
       return info;
     } catch (err) {
@@ -79,14 +101,30 @@ export const PurchasesProvider = ({ userId, children }) => {
     }
   }, []);
 
+  // Refresh customer info when app comes to foreground
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        refreshCustomerInfo();
+      }
+      appState.current = nextAppState;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [refreshCustomerInfo]);
+
   const purchasePackage = async (pkg) => {
     try {
       setError(null);
       const { customerInfo } = await Purchases.purchasePackage(pkg);
       setCustomerInfo(customerInfo);
 
+      const activeEntitlements = Object.keys(customerInfo.entitlements.active);
       const hasPremium = customerInfo.entitlements.active[ENTITLEMENTS.PREMIUM] !== undefined;
-      setIsPremium(hasPremium);
+      const hasAnyEntitlement = activeEntitlements.length > 0;
+      setIsPremium(hasPremium || hasAnyEntitlement);
 
       return { success: true, customerInfo };
     } catch (err) {
@@ -104,8 +142,10 @@ export const PurchasesProvider = ({ userId, children }) => {
       const info = await Purchases.restorePurchases();
       setCustomerInfo(info);
 
+      const activeEntitlements = Object.keys(info.entitlements.active);
       const hasPremium = info.entitlements.active[ENTITLEMENTS.PREMIUM] !== undefined;
-      setIsPremium(hasPremium);
+      const hasAnyEntitlement = activeEntitlements.length > 0;
+      setIsPremium(hasPremium || hasAnyEntitlement);
 
       return { success: true, customerInfo: info };
     } catch (err) {

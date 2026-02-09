@@ -1,14 +1,14 @@
 // RevenueCat Configuration
-// Production API key for App Store sandbox/production testing
-export const REVENUECAT_API_KEY = 'appl_KoZGJqltRTQFteuRxIXIikTcMGc';
+// Production API key for iOS App Store (sandbox and production)
+export const REVENUECAT_API_KEY = 'appl_KUAQLBOxTMBSHpeVQvBhcEwcDF0';
 
 // Entitlement identifiers (from RevenueCat dashboard)
 export const ENTITLEMENTS = {
-  PREMIUM: 'HelloWorld Pro',
+  PREMIUM: 'premium',
 };
 
 // Product identifiers (from App Store Connect)
 export const PRODUCT_IDS = {
-  MONTHLY: 'lmwfy_monthly',
-  YEARLY: 'lmwfy_yearly',
+  MONTHLY: 'questplanner_monthly',
+  YEARLY: 'questplanner_yearly',
 };

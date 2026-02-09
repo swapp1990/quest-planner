@@ -15,6 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.swapnilsawant.questplanner",
+      "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -31,7 +32,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "3aaeb2a6-6c75-4924-95e9-da48cb32fcfe"
+        "projectId": "95fe78ae-c5c3-4c4c-8ac8-49800bf8b274"
       }
     },
     "owner": "swapp1990"

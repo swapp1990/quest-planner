@@ -126,7 +126,7 @@ const QuestCircle = ({ quest, onPress, isLocked = false }) => {
 // Main Component
 // ============================================================
 
-const CampaignHomeScreen = ({ navState, dispatch, onViewAct, onBack }) => {
+const CampaignHomeScreen = ({ navState, dispatch, onViewAct, onBack, onShowPaywall }) => {
   const {
     campaign,
     incrementQuest,
@@ -431,13 +431,13 @@ const CampaignHomeScreen = ({ navState, dispatch, onViewAct, onBack }) => {
           <Text style={styles.actHint}>
             {displayedChapter ? `${displayedChapter.subtitle}` : 'Journey Complete'}
           </Text>
-          {/* DEV: Complete chapter button */}
-          {displayedChapter && !isChapterComplete(displayedChapter) && !shouldHideQuests && (
+          {onShowPaywall && (
             <TouchableOpacity
-              style={styles.devCompleteButton}
-              onPress={() => devCompleteChapter(displayedChapter.id)}
+              style={styles.premiumButton}
+              onPress={onShowPaywall}
+              activeOpacity={0.8}
             >
-              <Text style={styles.devCompleteText}>DEV: Complete Act</Text>
+              <Text style={styles.premiumButtonText}>⭐ Go Premium</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -766,17 +766,19 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.5)',
     fontSize: 12,
   },
-  devCompleteButton: {
+  premiumButton: {
     marginTop: 8,
-    backgroundColor: 'rgba(255, 100, 100, 0.3)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    backgroundColor: 'rgba(255, 215, 0, 0.25)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.4)',
   },
-  devCompleteText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '600',
+  premiumButtonText: {
+    color: '#FFD700',
+    fontSize: 13,
+    fontWeight: '700',
   },
   // Unlock Overlay
   unlockOverlay: {

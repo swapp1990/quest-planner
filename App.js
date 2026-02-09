@@ -1,10 +1,12 @@
-import React, { useReducer, useEffect } from 'react';
+import React, { useReducer, useEffect, useState } from 'react';
 import { CampaignProvider, useCampaign } from './src/campaign';
+import { PurchasesProvider } from './src/purchases';
 import CampaignSelectScreen from './src/screens/CampaignSelectScreen';
 import CampaignIntroScreen from './src/screens/CampaignIntroScreen';
 import CampaignHomeScreen from './src/screens/CampaignHomeScreen';
 import ChapterDetailScreen from './src/screens/ChapterDetailScreen';
 import CampaignBriefingModal from './src/screens/CampaignBriefingModal';
+import PaywallScreen from './src/screens/PaywallScreen';
 import {
   SCREENS,
   HOME_STATES,
@@ -23,6 +25,8 @@ const AppContent = () => {
     isChapterComplete,
     completeBriefing,
   } = useCampaign();
+
+  const [showPaywall, setShowPaywall] = useState(false);
 
   // Initialize state machine
   const [navState, dispatch] = useReducer(
@@ -115,6 +119,10 @@ const AppContent = () => {
   // RENDER
   // ============================================================
 
+  if (showPaywall) {
+    return <PaywallScreen onClose={() => setShowPaywall(false)} />;
+  }
+
   switch (navState.screen) {
     case SCREENS.SELECT:
       return (
@@ -169,6 +177,7 @@ const AppContent = () => {
           dispatch={dispatch}
           onViewAct={handleViewChapter}
           onBack={handleExitCampaign}
+          onShowPaywall={() => setShowPaywall(true)}
         />
       );
   }
@@ -176,8 +185,10 @@ const AppContent = () => {
 
 export default function App() {
   return (
-    <CampaignProvider>
-      <AppContent />
-    </CampaignProvider>
+    <PurchasesProvider>
+      <CampaignProvider>
+        <AppContent />
+      </CampaignProvider>
+    </PurchasesProvider>
   );
 }

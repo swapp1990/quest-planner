@@ -18,7 +18,7 @@ const ONBOARDING_STORAGE_KEY = '@campaign_onboarding';
 const BRIEFING_STORAGE_KEY = '@campaign_briefing';
 
 // Set to true to clear cache on app reload (for development)
-const DEV_CLEAR_CACHE = true;
+const DEV_CLEAR_CACHE = false;
 
 const CampaignContext = createContext(null);
 
